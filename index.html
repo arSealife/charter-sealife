@@ -19,23 +19,29 @@
   .login-card h1{font-size:20px;margin:0 0 4px;color:var(--navy);}
   .login-card p.sub{color:var(--muted);font-size:13px;margin:0 0 24px;}
   label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 4px;text-transform:uppercase;letter-spacing:.4px;}
-  input{width:100%;padding:10px 12px;border:1px solid #d7e0e6;border-radius:8px;font-size:15px;}
-  input:focus{outline:none;border-color:var(--navy);}
+  input,select{width:100%;padding:10px 12px;border:1px solid #d7e0e6;border-radius:8px;font-size:15px;font-family:inherit;background:#fff;}
+  input:focus,select:focus{outline:none;border-color:var(--navy);}
   .btn{display:inline-block;width:100%;margin-top:20px;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;}
   .btn:hover{background:var(--navy-d);}
   .btn.secondary{background:transparent;color:var(--navy);border:1px solid var(--navy);}
   .btn.secondary:hover{background:#eaf1f5;}
   .toggle-link{display:block;text-align:center;margin-top:16px;font-size:13px;color:var(--navy);cursor:pointer;text-decoration:underline;}
   .error{background:#fdecea;color:var(--danger);padding:10px 12px;border-radius:8px;font-size:13px;margin-top:14px;}
-  .boats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:20px;}
-  .boat-card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06);border-left:5px solid var(--navy);}
-  .boat-card h3{margin:0 0 6px;font-size:17px;}
-  .boat-card .meta{font-size:12px;color:var(--muted);}
-  .boat-card.inactive{opacity:.5;}
-  .section-title{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+  .tabs{display:flex;gap:4px;margin-top:8px;border-bottom:1px solid #dbe4ea;}
+  .tab-btn{background:none;border:none;padding:10px 16px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;width:auto;}
+  .tab-btn.active{color:var(--navy);border-bottom-color:var(--navy);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:20px;}
+  .item-card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06);border-left:5px solid var(--navy);}
+  .item-card h3{margin:0 0 6px;font-size:17px;}
+  .item-card .meta{font-size:12px;color:var(--muted);}
+  .item-card .badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#eaf1f5;color:var(--navy);margin-top:6px;}
+  .item-card.inactive{opacity:.5;}
+  .section-title{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
   .section-title h2{font-size:16px;color:var(--navy);margin:0;}
-  .add-boat-btn{background:var(--navy);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer;}
-  .add-boat-btn:hover{background:var(--navy-d);}
+  .add-btn{background:var(--navy);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer;width:auto;}
+  .add-btn:hover{background:var(--navy-d);}
   .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;}
   .modal{background:#fff;border-radius:12px;padding:26px;width:100%;max-width:340px;}
   .modal h3{margin:0 0 4px;color:var(--navy);}
@@ -87,12 +93,38 @@
     </div>
   </header>
   <div class="wrap">
-    <div class="section-title">
-      <h2>Barcos</h2>
-      <button class="add-boat-btn hidden" id="addBoatBtn" onclick="openAddBoat()">+ Agregar barco</button>
+    <div class="tabs" id="tabBar">
+      <button class="tab-btn active" onclick="switchTab('barcos')">Barcos</button>
+      <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')">Equipo</button>
+      <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')">Vendedores</button>
     </div>
-    <div id="boatsGrid" class="boats-grid"></div>
-    <div id="boatsEmpty" class="empty-state hidden">Todavía no hay barcos. Agrega el primero.</div>
+
+    <div id="panelBarcos" class="tab-panel active">
+      <div class="section-title">
+        <h2>Barcos</h2>
+        <button class="add-btn hidden" id="addBoatBtn" onclick="openModal('addBoatModal')">+ Agregar barco</button>
+      </div>
+      <div id="boatsGrid" class="cards-grid"></div>
+      <div id="boatsEmpty" class="empty-state hidden">Todavía no hay barcos. Agrega el primero.</div>
+    </div>
+
+    <div id="panelEquipo" class="tab-panel">
+      <div class="section-title">
+        <h2>Equipo</h2>
+        <button class="add-btn" onclick="openModal('addUserModal')">+ Agregar persona</button>
+      </div>
+      <div id="usersGrid" class="cards-grid"></div>
+      <div id="usersEmpty" class="empty-state hidden">Todavía no hay equipo. Agrega el primero.</div>
+    </div>
+
+    <div id="panelVendedores" class="tab-panel">
+      <div class="section-title">
+        <h2>Vendedores</h2>
+        <button class="add-btn" onclick="openModal('addVendorModal')">+ Agregar vendedor</button>
+      </div>
+      <div id="vendorsGrid" class="cards-grid"></div>
+      <div id="vendorsEmpty" class="empty-state hidden">Todavía no hay vendedores. Agrega el primero.</div>
+    </div>
   </div>
 </div>
 
@@ -104,8 +136,49 @@
     <label>Color</label>
     <input id="newBoatColor" type="color" value="#1a5276" style="height:40px;padding:4px;">
     <div class="modal-actions">
-      <button class="btn secondary" style="flex:1" onclick="closeAddBoat()">Cancelar</button>
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addBoatModal')">Cancelar</button>
       <button class="btn" style="flex:1" onclick="submitAddBoat()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<div id="addUserModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Nueva persona del equipo</h3>
+    <label>Nombre</label>
+    <input id="newUserName" placeholder="ej. Juan Pérez">
+    <label>Puesto</label>
+    <select id="newUserRole">
+      <option value="capitan">Capitán</option>
+      <option value="mecanico">Mecánico</option>
+      <option value="comprador">Comprador</option>
+      <option value="reservas">Reservas</option>
+      <option value="administrador">Administrador</option>
+    </select>
+    <label>PIN</label>
+    <input id="newUserPin" type="password" inputmode="numeric" placeholder="4 dígitos">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addUserModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddUser()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<div id="addVendorModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Nuevo vendedor</h3>
+    <label>Nombre</label>
+    <input id="newVendorName" placeholder="ej. Agencia Turística XYZ">
+    <label>Tipo</label>
+    <select id="newVendorType">
+      <option value="directo">Vendedor directo</option>
+      <option value="empresa_credito">Empresa con crédito</option>
+    </select>
+    <label>PIN</label>
+    <input id="newVendorPin" type="password" inputmode="numeric" placeholder="4 dígitos">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addVendorModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddVendor()">Crear</button>
     </div>
   </div>
 </div>
@@ -117,6 +190,7 @@ const RPC = (fn) => `${SUPABASE_URL}/rest/v1/rpc/${fn}`;
 const SESSION_KEY = 'cs_session';
 
 let session = null;
+const loadedTabs = new Set();
 
 async function callRpc(fn, body){
   const res = await fetch(RPC(fn), {
@@ -187,6 +261,7 @@ function saveSession(data){
 function doLogout(){
   localStorage.removeItem(SESSION_KEY);
   session = null;
+  loadedTabs.clear();
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginSlug').value = '';
@@ -198,13 +273,33 @@ async function enterDashboard(){
   document.getElementById('dashboardScreen').classList.remove('hidden');
   document.getElementById('companyNameLabel').textContent = session.company_name || 'Charter Sealife';
   document.getElementById('whoLabel').textContent = `${session.name} · ${roleLabel(session.role)}`;
-  document.getElementById('addBoatBtn').classList.toggle('hidden', session.role !== 'administrador');
-  await loadBoats();
+  const isAdmin = session.role === 'administrador';
+  document.getElementById('addBoatBtn').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnEquipo').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnVendedores').classList.toggle('hidden', !isAdmin);
+  switchTab('barcos');
 }
 
 function roleLabel(r){
   return { administrador:'Administrador', capitan:'Capitán', mecanico:'Mecánico', comprador:'Comprador', reservas:'Reservas', vendedor:'Vendedor' }[r] || r;
 }
+
+function switchTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const btnMap = { barcos: 0, equipo: 1, vendedores: 2 };
+  document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
+  document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  if (!loadedTabs.has(name)) {
+    loadedTabs.add(name);
+    if (name === 'barcos') loadBoats();
+    if (name === 'equipo') loadUsers();
+    if (name === 'vendedores') loadVendors();
+  }
+}
+
+function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
 
 async function loadBoats(){
   const grid = document.getElementById('boatsGrid');
@@ -212,11 +307,11 @@ async function loadBoats(){
   grid.innerHTML = '';
   try{
     const boats = await callRpc('list_boats', { p_token: session.token });
-    if (!boats.length){ empty.classList.remove('hidden'); return; }
+    if (!boats.length){ empty.textContent = 'Todavía no hay barcos. Agrega el primero.'; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
     boats.forEach(b => {
       const card = document.createElement('div');
-      card.className = 'boat-card' + (b.active ? '' : ' inactive');
+      card.className = 'item-card' + (b.active ? '' : ' inactive');
       card.style.borderLeftColor = b.color || '#1a5276';
       card.innerHTML = `<h3>${escapeHtml(b.name)}</h3><div class="meta">${b.tracker_id ? 'GPS vinculado' : 'Sin GPS configurado'}</div>`;
       grid.appendChild(card);
@@ -227,24 +322,95 @@ async function loadBoats(){
   }
 }
 
+async function loadUsers(){
+  const grid = document.getElementById('usersGrid');
+  const empty = document.getElementById('usersEmpty');
+  grid.innerHTML = '';
+  try{
+    const users = await callRpc('list_users', { p_token: session.token });
+    if (!users.length){ empty.textContent = 'Todavía no hay equipo. Agrega el primero.'; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    users.forEach(u => {
+      const card = document.createElement('div');
+      card.className = 'item-card' + (u.active ? '' : ' inactive');
+      card.innerHTML = `<h3>${escapeHtml(u.name)}</h3><span class="badge">${roleLabel(u.role)}</span>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudo cargar el equipo: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+async function loadVendors(){
+  const grid = document.getElementById('vendorsGrid');
+  const empty = document.getElementById('vendorsEmpty');
+  grid.innerHTML = '';
+  try{
+    const vendors = await callRpc('list_vendors', { p_token: session.token });
+    if (!vendors.length){ empty.textContent = 'Todavía no hay vendedores. Agrega el primero.'; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    vendors.forEach(v => {
+      const card = document.createElement('div');
+      card.className = 'item-card' + (v.active ? '' : ' inactive');
+      const typeLabel = v.vendor_type === 'empresa_credito' ? 'Empresa con crédito' : 'Vendedor directo';
+      card.innerHTML = `<h3>${escapeHtml(v.name)}</h3><span class="badge">${typeLabel}</span>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudieron cargar los vendedores: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function openAddBoat(){ document.getElementById('addBoatModal').classList.remove('hidden'); }
-function closeAddBoat(){
-  document.getElementById('addBoatModal').classList.add('hidden');
-  document.getElementById('newBoatName').value = '';
-}
 async function submitAddBoat(){
   const name = document.getElementById('newBoatName').value.trim();
   const color = document.getElementById('newBoatColor').value;
   if (!name) return;
   try{
     await callRpc('create_boat', { p_token: session.token, p_name: name, p_color: color });
-    closeAddBoat();
+    closeModal('addBoatModal');
+    document.getElementById('newBoatName').value = '';
     await loadBoats();
   }catch(e){ alert('Error al crear barco: ' + e.message); }
+}
+
+async function submitAddUser(){
+  const name = document.getElementById('newUserName').value.trim();
+  const role = document.getElementById('newUserRole').value;
+  const pin = document.getElementById('newUserPin').value.trim();
+  if (!name || !pin) return alert('Completa nombre y PIN.');
+  try{
+    await callRpc('create_user', { p_token: session.token, p_name: name, p_role: role, p_pin: pin });
+    closeModal('addUserModal');
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserPin').value = '';
+    await loadUsers();
+  }catch(e){
+    const map = { pin_taken: 'Ese PIN ya está en uso en tu empresa, elige otro.' };
+    alert('Error al agregar: ' + (map[e.message] || e.message));
+  }
+}
+
+async function submitAddVendor(){
+  const name = document.getElementById('newVendorName').value.trim();
+  const type = document.getElementById('newVendorType').value;
+  const pin = document.getElementById('newVendorPin').value.trim();
+  if (!name || !pin) return alert('Completa nombre y PIN.');
+  try{
+    await callRpc('create_vendor', { p_token: session.token, p_name: name, p_pin: pin, p_vendor_type: type });
+    closeModal('addVendorModal');
+    document.getElementById('newVendorName').value = '';
+    document.getElementById('newVendorPin').value = '';
+    await loadVendors();
+  }catch(e){
+    const map = { pin_taken: 'Ese PIN ya está en uso en tu empresa, elige otro.' };
+    alert('Error al agregar: ' + (map[e.message] || e.message));
+  }
 }
 
 (function init(){
