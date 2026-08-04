@@ -107,6 +107,7 @@
       <button class="tab-btn active" onclick="switchTab('barcos')">Barcos</button>
       <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')">Equipo</button>
       <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')">Vendedores</button>
+      <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')">Reportes</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel active">
@@ -134,6 +135,14 @@
       </div>
       <div id="vendorsGrid" class="cards-grid"></div>
       <div id="vendorsEmpty" class="empty-state hidden">Todavía no hay vendedores. Agrega el primero.</div>
+    </div>
+
+    <div id="panelReportes" class="tab-panel">
+      <div class="section-title">
+        <h2>Reportes de vendedores</h2>
+      </div>
+      <div id="reportsGrid" class="cards-grid"></div>
+      <div id="reportsEmpty" class="empty-state hidden">Todavía no hay reservas de vendedores.</div>
     </div>
   </div>
 </div>
@@ -231,6 +240,29 @@
   </div>
 </div>
 
+<div id="vendorDetailModal" class="modal-bg hidden">
+  <div class="modal" style="max-width:460px;max-height:80vh;overflow-y:auto;">
+    <h3 id="vendorDetailTitle">Vendedor</h3>
+    <div id="vendorDetailList" style="margin-top:14px;"></div>
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('vendorDetailModal')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<div id="registerPaymentModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Registrar pago</h3>
+    <input type="hidden" id="payResId">
+    <label>Monto (MXN)</label>
+    <input id="newPaymentAmount" type="number" min="0" step="1" placeholder="ej. 1500">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('registerPaymentModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitRegisterPayment()">Guardar pago</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://znkmryggkbirrmvybogo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_tpWZEqgBbMmFEGDBgWZCnQ_j0uuLIIu';
@@ -239,6 +271,8 @@ const SESSION_KEY = 'cs_session';
 
 let session = null;
 let boatsById = {};
+let vendorsCache = {};
+let reservationsCache = [];
 const loadedTabs = new Set();
 
 async function callRpc(fn, body){
@@ -336,6 +370,7 @@ async function enterDashboard(){
   document.getElementById('addBoatBtn').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnEquipo').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnVendedores').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnReportes').classList.toggle('hidden', !isAdmin);
   switchTab('barcos');
 }
 
@@ -346,7 +381,7 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { barcos: 0, equipo: 1, vendedores: 2 };
+  const btnMap = { barcos: 0, equipo: 1, vendedores: 2, reportes: 3 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
@@ -354,6 +389,7 @@ function switchTab(name){
     if (name === 'barcos') loadBoats();
     if (name === 'equipo') loadUsers();
     if (name === 'vendedores') loadVendors();
+    if (name === 'reportes') loadReports();
   }
 }
 
@@ -420,6 +456,92 @@ async function loadVendors(){
     empty.textContent = 'No se pudieron cargar los vendedores: ' + e.message;
     empty.classList.remove('hidden');
   }
+}
+
+async function loadReports(){
+  const grid = document.getElementById('reportsGrid');
+  const empty = document.getElementById('reportsEmpty');
+  grid.innerHTML = '';
+  try{
+    const [reservations, vendors, boats] = await Promise.all([
+      callRpc('list_reservations', { p_token: session.token }),
+      callRpc('list_vendors', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+    reservationsCache = reservations;
+    vendorsCache = {};
+    vendors.forEach(v => vendorsCache[v.id] = v);
+    boats.forEach(b => boatsById[b.id] = b.name);
+
+    const byVendor = {};
+    reservations.forEach(r => {
+      if (!r.vendor_id) return;
+      if (!byVendor[r.vendor_id]) byVendor[r.vendor_id] = [];
+      byVendor[r.vendor_id].push(r);
+    });
+
+    const vendorIds = Object.keys(byVendor);
+    if (!vendorIds.length){ empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+
+    vendorIds.map(vid => {
+      const list = byVendor[vid];
+      const totalReservado = list.reduce((s,r) => s + Number(r.amount||0), 0);
+      const totalPagado = list.reduce((s,r) => s + Number(r.paid_amount||0), 0);
+      return { vid, list, totalReservado, totalPagado, pendiente: totalReservado - totalPagado };
+    }).sort((a,b) => b.pendiente - a.pendiente).forEach(({vid, list, totalReservado, totalPagado, pendiente}) => {
+      const v = vendorsCache[vid];
+      const typeLabel = v && v.vendor_type === 'empresa_credito' ? 'Empresa con crédito' : 'Vendedor directo';
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `<h3>${escapeHtml(v ? v.name : 'Vendedor')}</h3>
+        <span class="badge">${typeLabel}</span>
+        <div class="meta" style="margin-top:8px;">${list.length} reserva(s)</div>
+        <div class="meta">Reservado: ${fmtMoney(totalReservado)}</div>
+        <div class="meta">Pagado: ${fmtMoney(totalPagado)}</div>
+        <div class="meta" style="margin-top:4px;font-weight:700;color:${pendiente>0?'var(--danger)':'var(--ok)'};">Pendiente: ${fmtMoney(pendiente)}</div>
+        <button class="btn secondary" style="margin-top:10px;" onclick="openVendorDetail('${vid}')">Ver detalle</button>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudo cargar el reporte: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+function openVendorDetail(vid){
+  const v = vendorsCache[vid];
+  const list = reservationsCache.filter(r => r.vendor_id === vid);
+  document.getElementById('vendorDetailTitle').textContent = v ? v.name : 'Vendedor';
+  const box = document.getElementById('vendorDetailList');
+  box.innerHTML = list.map(r => {
+    const pend = Number(r.amount||0) - Number(r.paid_amount||0);
+    return `<div class="item-card" style="margin-bottom:10px;">
+      <h3>${escapeHtml(boatsById[r.boat_id] || 'Barco')}</h3>
+      <div class="meta">${r.reservation_date} · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
+      <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
+      ${pend > 0 ? `<div><button class="btn" style="margin-top:10px;" onclick="openRegisterPayment('${r.id}', ${pend})">Registrar pago</button></div>` : ''}
+    </div>`;
+  }).join('') || '<div class="empty-state">Sin reservas.</div>';
+  openModal('vendorDetailModal');
+}
+
+function openRegisterPayment(reservationId, pendingAmount){
+  document.getElementById('payResId').value = reservationId;
+  document.getElementById('newPaymentAmount').value = pendingAmount;
+  openModal('registerPaymentModal');
+}
+
+async function submitRegisterPayment(){
+  const reservationId = document.getElementById('payResId').value;
+  const amount = Number(document.getElementById('newPaymentAmount').value);
+  if (!amount || amount <= 0) return alert('Ingresa un monto válido.');
+  try{
+    await callRpc('register_payment', { p_token: session.token, p_reservation_id: reservationId, p_amount: amount });
+    closeModal('registerPaymentModal');
+    closeModal('vendorDetailModal');
+    await loadReports();
+  }catch(e){ alert('Error al registrar pago: ' + e.message); }
 }
 
 function escapeHtml(s){
