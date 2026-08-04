@@ -49,6 +49,16 @@
   .modal-actions .btn{margin-top:0;}
   .empty-state{color:var(--muted);font-size:14px;padding:40px 0;text-align:center;}
   .hidden{display:none !important;}
+  .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-top:20px;}
+  .stat-card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
+  .stat-card .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
+  .stat-card .value{font-size:24px;font-weight:700;color:var(--navy);margin-top:6px;}
+  .stat-card.pending .value{color:var(--danger);}
+  .status-pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px;}
+  .status-pill.pendiente{background:#fdf3e0;color:#a86a00;}
+  .status-pill.parcial{background:#e8f0fb;color:#1a5276;}
+  .status-pill.pagado{background:#e6f6ec;color:var(--ok);}
+  .status-pill.cancelada{background:#fdecea;color:var(--danger);}
 </style>
 </head>
 <body>
@@ -128,6 +138,26 @@
   </div>
 </div>
 
+<div id="vendorScreen" class="hidden">
+  <header>
+    <div class="brand" id="vendorCompanyLabel">Charter Sealife</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="who" id="vendorWhoLabel"></div>
+      <button onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div id="vendorSummary" class="stats-row"></div>
+
+    <div class="section-title">
+      <h2>Mis reservas</h2>
+      <button class="add-btn" onclick="openAddReservation()">+ Nueva reserva</button>
+    </div>
+    <div id="reservationsGrid" class="cards-grid"></div>
+    <div id="reservationsEmpty" class="empty-state hidden">Todavía no tienes reservas. Crea la primera.</div>
+  </div>
+</div>
+
 <div id="addBoatModal" class="modal-bg hidden">
   <div class="modal">
     <h3>Nuevo barco</h3>
@@ -183,6 +213,24 @@
   </div>
 </div>
 
+<div id="addReservationModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Nueva reserva</h3>
+    <label>Barco</label>
+    <select id="newResBoat"></select>
+    <label>Fecha</label>
+    <input id="newResDate" type="date">
+    <label>Horas</label>
+    <input id="newResHours" type="number" min="1" step="0.5" placeholder="ej. 4">
+    <label>Monto (MXN)</label>
+    <input id="newResAmount" type="number" min="0" step="1" placeholder="ej. 3000">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addReservationModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddReservation()">Reservar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://znkmryggkbirrmvybogo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_tpWZEqgBbMmFEGDBgWZCnQ_j0uuLIIu';
@@ -190,6 +238,7 @@ const RPC = (fn) => `${SUPABASE_URL}/rest/v1/rpc/${fn}`;
 const SESSION_KEY = 'cs_session';
 
 let session = null;
+let boatsById = {};
 const loadedTabs = new Set();
 
 async function callRpc(fn, body){
@@ -235,7 +284,7 @@ async function doLogin(){
   try{
     const data = await callRpc('login_pin', { p_slug: slug, p_pin: pin });
     saveSession(data);
-    enterDashboard();
+    routeToScreen();
   }catch(e){ showError(e.message); }
 }
 
@@ -249,7 +298,7 @@ async function doSignup(){
   try{
     const data = await callRpc('signup_company', { p_company_name: company_name, p_slug: slug, p_admin_name: admin_name, p_pin: pin });
     saveSession(data);
-    enterDashboard();
+    routeToScreen();
   }catch(e){ showError(e.message); }
 }
 
@@ -263,13 +312,23 @@ function doLogout(){
   session = null;
   loadedTabs.clear();
   document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('vendorScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginSlug').value = '';
   document.getElementById('loginPin').value = '';
 }
 
-async function enterDashboard(){
+function routeToScreen(){
   document.getElementById('loginScreen').classList.add('hidden');
+  if (session.role === 'vendedor') {
+    enterVendorView();
+  } else {
+    enterDashboard();
+  }
+}
+
+async function enterDashboard(){
+  document.getElementById('vendorScreen').classList.add('hidden');
   document.getElementById('dashboardScreen').classList.remove('hidden');
   document.getElementById('companyNameLabel').textContent = session.company_name || 'Charter Sealife';
   document.getElementById('whoLabel').textContent = `${session.name} · ${roleLabel(session.role)}`;
@@ -367,6 +426,14 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function fmtMoney(n){
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n || 0);
+}
+
+function statusLabel(s){
+  return { pendiente:'Pendiente', parcial:'Parcial', pagado:'Pagado', pre_reserva:'Pre-reserva', cancelada:'Cancelada' }[s] || s;
+}
+
 async function submitAddBoat(){
   const name = document.getElementById('newBoatName').value.trim();
   const color = document.getElementById('newBoatColor').value;
@@ -413,12 +480,93 @@ async function submitAddVendor(){
   }
 }
 
+// ===== Vista de vendedor =====
+
+async function enterVendorView(){
+  document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('vendorScreen').classList.remove('hidden');
+  document.getElementById('vendorCompanyLabel').textContent = session.company_name || 'Charter Sealife';
+  const typeLabel = session.vendor_type === 'empresa_credito' ? 'Empresa con crédito' : 'Vendedor directo';
+  document.getElementById('vendorWhoLabel').textContent = `${session.name} · ${typeLabel}`;
+
+  const boats = await callRpc('list_boats', { p_token: session.token });
+  boatsById = {};
+  boats.forEach(b => boatsById[b.id] = b.name);
+  const sel = document.getElementById('newResBoat');
+  sel.innerHTML = boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+
+  await loadMyReservations();
+}
+
+function openAddReservation(){
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('newResDate').value = today;
+  openModal('addReservationModal');
+}
+
+async function loadMyReservations(){
+  const grid = document.getElementById('reservationsGrid');
+  const empty = document.getElementById('reservationsEmpty');
+  const summary = document.getElementById('vendorSummary');
+  grid.innerHTML = '';
+  try{
+    const reservations = await callRpc('list_reservations', { p_token: session.token });
+
+    if (session.vendor_type === 'empresa_credito') {
+      const totalReservado = reservations.reduce((s,r) => s + Number(r.amount||0), 0);
+      const totalPagado = reservations.reduce((s,r) => s + Number(r.paid_amount||0), 0);
+      const pendiente = totalReservado - totalPagado;
+      summary.innerHTML = `
+        <div class="stat-card"><div class="label">Total reservado</div><div class="value">${fmtMoney(totalReservado)}</div></div>
+        <div class="stat-card"><div class="label">Total pagado</div><div class="value">${fmtMoney(totalPagado)}</div></div>
+        <div class="stat-card pending"><div class="label">Pendiente</div><div class="value">${fmtMoney(pendiente)}</div></div>
+      `;
+    } else {
+      summary.innerHTML = `
+        <div class="stat-card"><div class="label">Reservas realizadas</div><div class="value">${reservations.length}</div></div>
+      `;
+    }
+
+    if (!reservations.length){ empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    reservations.forEach(r => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `<h3>${escapeHtml(boatsById[r.boat_id] || 'Barco')}</h3>
+        <div class="meta">${r.reservation_date} · ${r.hours || '-'} hrs · ${fmtMoney(r.amount)}</div>
+        <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudieron cargar tus reservas: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+async function submitAddReservation(){
+  const boat_id = document.getElementById('newResBoat').value;
+  const date = document.getElementById('newResDate').value;
+  const hours = document.getElementById('newResHours').value;
+  const amount = document.getElementById('newResAmount').value;
+  if (!boat_id || !date) return alert('Elige barco y fecha.');
+  try{
+    await callRpc('create_reservation', {
+      p_token: session.token, p_boat_id: boat_id, p_reservation_date: date,
+      p_hours: hours ? Number(hours) : null, p_amount: amount ? Number(amount) : 0
+    });
+    closeModal('addReservationModal');
+    document.getElementById('newResHours').value = '';
+    document.getElementById('newResAmount').value = '';
+    await loadMyReservations();
+  }catch(e){ alert('Error al reservar: ' + e.message); }
+}
+
 (function init(){
   const saved = localStorage.getItem(SESSION_KEY);
   if (saved){
     try{
       session = JSON.parse(saved);
-      enterDashboard();
+      routeToScreen();
       return;
     }catch(e){ localStorage.removeItem(SESSION_KEY); }
   }
