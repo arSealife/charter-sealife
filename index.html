@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charter Sealife</title>
+<style>
+  :root{--navy:#1a5276;--navy-d:#123a54;--bg:#f4f7f9;--card:#ffffff;--text:#1c2b36;--muted:#6b7c88;--danger:#c0392b;--ok:#1e8449;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  .wrap{max-width:1000px;margin:0 auto;padding:24px;}
+  header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:var(--navy);color:#fff;}
+  header .brand{font-weight:700;font-size:18px;letter-spacing:.3px;}
+  header .who{font-size:13px;opacity:.85;text-align:right;}
+  header button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;}
+  header button:hover{background:rgba(255,255,255,.28);}
+  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;}
+  .login-card{background:var(--card);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:36px;width:100%;max-width:380px;}
+  .login-card h1{font-size:20px;margin:0 0 4px;color:var(--navy);}
+  .login-card p.sub{color:var(--muted);font-size:13px;margin:0 0 24px;}
+  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 4px;text-transform:uppercase;letter-spacing:.4px;}
+  input{width:100%;padding:10px 12px;border:1px solid #d7e0e6;border-radius:8px;font-size:15px;}
+  input:focus{outline:none;border-color:var(--navy);}
+  .btn{display:inline-block;width:100%;margin-top:20px;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;}
+  .btn:hover{background:var(--navy-d);}
+  .btn.secondary{background:transparent;color:var(--navy);border:1px solid var(--navy);}
+  .btn.secondary:hover{background:#eaf1f5;}
+  .toggle-link{display:block;text-align:center;margin-top:16px;font-size:13px;color:var(--navy);cursor:pointer;text-decoration:underline;}
+  .error{background:#fdecea;color:var(--danger);padding:10px 12px;border-radius:8px;font-size:13px;margin-top:14px;}
+  .boats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:20px;}
+  .boat-card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06);border-left:5px solid var(--navy);}
+  .boat-card h3{margin:0 0 6px;font-size:17px;}
+  .boat-card .meta{font-size:12px;color:var(--muted);}
+  .boat-card.inactive{opacity:.5;}
+  .section-title{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
+  .section-title h2{font-size:16px;color:var(--navy);margin:0;}
+  .add-boat-btn{background:var(--navy);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer;}
+  .add-boat-btn:hover{background:var(--navy-d);}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .modal{background:#fff;border-radius:12px;padding:26px;width:100%;max-width:340px;}
+  .modal h3{margin:0 0 4px;color:var(--navy);}
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .modal-actions .btn{margin-top:0;}
+  .empty-state{color:var(--muted);font-size:14px;padding:40px 0;text-align:center;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" class="center-screen">
+  <div class="login-card">
+    <h1>Charter Sealife</h1>
+    <p class="sub" id="loginSub">Entra con el código de tu empresa y tu PIN.</p>
+
+    <div id="loginForm">
+      <label>Código de empresa</label>
+      <input id="loginSlug" placeholder="ej. test-co" autocomplete="off">
+      <label>PIN</label>
+      <input id="loginPin" type="password" inputmode="numeric" placeholder="••••">
+      <button class="btn" onclick="doLogin()">Entrar</button>
+      <span class="toggle-link" onclick="toggleForm('signup')">¿Nueva empresa? Regístrala aquí</span>
+    </div>
+
+    <div id="signupForm" class="hidden">
+      <label>Nombre de la empresa</label>
+      <input id="suName" placeholder="ej. Mi Empresa de Charter">
+      <label>Código único (slug)</label>
+      <input id="suSlug" placeholder="ej. mi-empresa" autocomplete="off">
+      <label>Tu nombre (administrador)</label>
+      <input id="suAdmin" placeholder="ej. Juan Pérez">
+      <label>Crea un PIN</label>
+      <input id="suPin" type="password" inputmode="numeric" placeholder="4 dígitos">
+      <button class="btn" onclick="doSignup()">Crear empresa</button>
+      <span class="toggle-link" onclick="toggleForm('login')">Ya tengo cuenta, iniciar sesión</span>
+    </div>
+
+    <div id="loginError" class="error hidden"></div>
+  </div>
+</div>
+
+<div id="dashboardScreen" class="hidden">
+  <header>
+    <div class="brand" id="companyNameLabel">Charter Sealife</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="who" id="whoLabel"></div>
+      <button onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="section-title">
+      <h2>Barcos</h2>
+      <button class="add-boat-btn hidden" id="addBoatBtn" onclick="openAddBoat()">+ Agregar barco</button>
+    </div>
+    <div id="boatsGrid" class="boats-grid"></div>
+    <div id="boatsEmpty" class="empty-state hidden">Todavía no hay barcos. Agrega el primero.</div>
+  </div>
+</div>
+
+<div id="addBoatModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Nuevo barco</h3>
+    <label>Nombre</label>
+    <input id="newBoatName" placeholder="ej. Alegria">
+    <label>Color</label>
+    <input id="newBoatColor" type="color" value="#1a5276" style="height:40px;padding:4px;">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeAddBoat()">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddBoat()">Crear</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://znkmryggkbirrmvybogo.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_tpWZEqgBbMmFEGDBgWZCnQ_j0uuLIIu';
+const RPC = (fn) => `${SUPABASE_URL}/rest/v1/rpc/${fn}`;
+const SESSION_KEY = 'cs_session';
+
+let session = null;
+
+async function callRpc(fn, body){
+  const res = await fetch(RPC(fn), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+    body: JSON.stringify(body || {})
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const msg = (data && (data.message || data.hint)) || 'error';
+    throw new Error(msg);
+  }
+  return data;
+}
+
+function toggleForm(which){
+  document.getElementById('loginForm').classList.toggle('hidden', which !== 'login');
+  document.getElementById('signupForm').classList.toggle('hidden', which !== 'signup');
+  document.getElementById('loginSub').textContent = which === 'login'
+    ? 'Entra con el código de tu empresa y tu PIN.'
+    : 'Crea tu empresa y tu cuenta de administrador.';
+  hideError();
+}
+
+function showError(msg){
+  const el = document.getElementById('loginError');
+  const map = {
+    company_not_found: 'No existe ninguna empresa con ese código.',
+    invalid_pin: 'PIN incorrecto.',
+    slug_taken: 'Ese código de empresa ya está en uso, elige otro.'
+  };
+  el.textContent = map[msg] || msg;
+  el.classList.remove('hidden');
+}
+function hideError(){ document.getElementById('loginError').classList.add('hidden'); }
+
+async function doLogin(){
+  hideError();
+  const slug = document.getElementById('loginSlug').value.trim();
+  const pin = document.getElementById('loginPin').value.trim();
+  if (!slug || !pin) return showError('Completa código de empresa y PIN.');
+  try{
+    const data = await callRpc('login_pin', { p_slug: slug, p_pin: pin });
+    saveSession(data);
+    enterDashboard();
+  }catch(e){ showError(e.message); }
+}
+
+async function doSignup(){
+  hideError();
+  const company_name = document.getElementById('suName').value.trim();
+  const slug = document.getElementById('suSlug').value.trim();
+  const admin_name = document.getElementById('suAdmin').value.trim();
+  const pin = document.getElementById('suPin').value.trim();
+  if (!company_name || !slug || !admin_name || !pin) return showError('Completa todos los campos.');
+  try{
+    const data = await callRpc('signup_company', { p_company_name: company_name, p_slug: slug, p_admin_name: admin_name, p_pin: pin });
+    saveSession(data);
+    enterDashboard();
+  }catch(e){ showError(e.message); }
+}
+
+function saveSession(data){
+  session = data;
+  localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+}
+
+function doLogout(){
+  localStorage.removeItem(SESSION_KEY);
+  session = null;
+  document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('loginSlug').value = '';
+  document.getElementById('loginPin').value = '';
+}
+
+async function enterDashboard(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('dashboardScreen').classList.remove('hidden');
+  document.getElementById('companyNameLabel').textContent = session.company_name || 'Charter Sealife';
+  document.getElementById('whoLabel').textContent = `${session.name} · ${roleLabel(session.role)}`;
+  document.getElementById('addBoatBtn').classList.toggle('hidden', session.role !== 'administrador');
+  await loadBoats();
+}
+
+function roleLabel(r){
+  return { administrador:'Administrador', capitan:'Capitán', mecanico:'Mecánico', comprador:'Comprador', reservas:'Reservas', vendedor:'Vendedor' }[r] || r;
+}
+
+async function loadBoats(){
+  const grid = document.getElementById('boatsGrid');
+  const empty = document.getElementById('boatsEmpty');
+  grid.innerHTML = '';
+  try{
+    const boats = await callRpc('list_boats', { p_token: session.token });
+    if (!boats.length){ empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    boats.forEach(b => {
+      const card = document.createElement('div');
+      card.className = 'boat-card' + (b.active ? '' : ' inactive');
+      card.style.borderLeftColor = b.color || '#1a5276';
+      card.innerHTML = `<h3>${escapeHtml(b.name)}</h3><div class="meta">${b.tracker_id ? 'GPS vinculado' : 'Sin GPS configurado'}</div>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudieron cargar los barcos: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function openAddBoat(){ document.getElementById('addBoatModal').classList.remove('hidden'); }
+function closeAddBoat(){
+  document.getElementById('addBoatModal').classList.add('hidden');
+  document.getElementById('newBoatName').value = '';
+}
+async function submitAddBoat(){
+  const name = document.getElementById('newBoatName').value.trim();
+  const color = document.getElementById('newBoatColor').value;
+  if (!name) return;
+  try{
+    await callRpc('create_boat', { p_token: session.token, p_name: name, p_color: color });
+    closeAddBoat();
+    await loadBoats();
+  }catch(e){ alert('Error al crear barco: ' + e.message); }
+}
+
+(function init(){
+  const saved = localStorage.getItem(SESSION_KEY);
+  if (saved){
+    try{
+      session = JSON.parse(saved);
+      enterDashboard();
+      return;
+    }catch(e){ localStorage.removeItem(SESSION_KEY); }
+  }
+})();
+</script>
+
+</body>
+</html>
