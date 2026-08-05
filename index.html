@@ -99,6 +99,7 @@
     <div class="brand" id="companyNameLabel">Charter Sealife</div>
     <div style="display:flex;align-items:center;gap:14px;">
       <button class="hidden" id="subscribeHeaderBtn" onclick="startCheckout()"></button>
+      <button class="hidden" id="manageSubBtn" onclick="openPortal()">Gestionar suscripción</button>
       <div class="who" id="whoLabel"></div>
       <button onclick="doLogout()">Salir</button>
     </div>
@@ -416,6 +417,19 @@ async function startCheckout(){
   }catch(e){ alert('No se pudo iniciar el pago: ' + e.message); }
 }
 
+async function openPortal(){
+  try{
+    const res = await fetch(EDGE('create-portal-session'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token: session.token })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'error');
+    window.location.href = data.url;
+  }catch(e){ alert('No se pudo abrir el portal de suscripción: ' + e.message); }
+}
+
 async function refreshSubscriptionThenRoute(){
   try{
     const data = await callRpc('get_subscription_status', { p_token: session.token });
@@ -448,6 +462,8 @@ async function enterDashboard(){
   } else {
     subBtn.classList.add('hidden');
   }
+  const manageBtn = document.getElementById('manageSubBtn');
+  manageBtn.classList.toggle('hidden', !(isAdmin && session.subscription_status === 'active'));
   switchTab('barcos');
 }
 
