@@ -158,6 +158,7 @@
     <div style="display:flex;align-items:center;gap:14px;">
       <button class="hidden" id="subscribeHeaderBtn" onclick="startCheckout()"></button>
       <button class="hidden" id="manageSubBtn" onclick="openPortal()">Gestionar suscripción</button>
+      <button class="hidden" id="telegramBtn" onclick="openTelegramModal()"><i class="fa-brands fa-telegram"></i> Telegram</button>
       <div class="who" id="whoLabel"></div>
       <button onclick="doLogout()">Salir</button>
     </div>
@@ -559,6 +560,18 @@
   </div>
 </div>
 
+<div id="telegramModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Notificaciones por Telegram</h3>
+    <div id="telegramModalBody">
+      <p class="sub">Cargando...</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('telegramModal')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://znkmryggkbirrmvybogo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_tpWZEqgBbMmFEGDBgWZCnQ_j0uuLIIu';
@@ -761,6 +774,7 @@ async function enterDashboard(){
   document.getElementById('tabBtnReportes').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnGastos').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnOperacion').classList.toggle('hidden', !isAdmin);
+  document.getElementById('telegramBtn').classList.toggle('hidden', !isAdmin);
   const subBtn = document.getElementById('subscribeHeaderBtn');
   if (isAdmin && session.subscription_status !== 'active') {
     subBtn.classList.remove('hidden');
@@ -1406,7 +1420,39 @@ async function submitAddReservation(){
     document.getElementById('newResAmount').value = '';
     await loadMyReservations();
     showToast('Reserva creada 🚤');
+    fetch(EDGE('notify-reservation'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token: session.token, boat_id: boat_id, reservation_date: date })
+    }).catch(() => {});
   }catch(e){ showToast('Error al reservar: ' + e.message, 'error'); }
+}
+
+async function openTelegramModal(){
+  openModal('telegramModal');
+  const body = document.getElementById('telegramModalBody');
+  body.innerHTML = '<p class="sub">Cargando...</p>';
+  try{
+    const status = await callRpc('get_telegram_status', { p_token: session.token });
+    if (status.linked) {
+      body.innerHTML = `<p class="sub">✅ Vinculado. El equipo recibirá un mensaje de Telegram cada vez que se cree una reserva.</p>
+        <button class="btn secondary" style="margin-top:10px;width:100%;" onclick="submitUnlinkTelegram()">Desvincular</button>`;
+    } else {
+      const link = 'https://t.me/CharterSealife_bot?start=' + status.link_code;
+      body.innerHTML = `<p class="sub">Vincula tu Telegram para recibir un aviso cada vez que se cree una nueva reserva.</p>
+        <a class="btn" style="display:block;text-align:center;margin-top:10px;text-decoration:none;" href="${link}" target="_blank">Abrir bot y vincular</a>
+        <p class="sub" style="margin-top:10px;">Después de presionar "Iniciar" en Telegram, vuelve aquí y refresca este panel.</p>
+        <button class="btn secondary" style="margin-top:10px;width:100%;" onclick="openTelegramModal()">Actualizar estado</button>`;
+    }
+  }catch(e){ body.innerHTML = '<p class="sub">Error al cargar el estado: ' + e.message + '</p>'; }
+}
+
+async function submitUnlinkTelegram(){
+  try{
+    await callRpc('unlink_telegram', { p_token: session.token });
+    showToast('Telegram desvinculado');
+    openTelegramModal();
+  }catch(e){ showToast('Error al desvincular: ' + e.message, 'error'); }
 }
 
 // ===== Vista de capitán =====
