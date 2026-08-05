@@ -3,69 +3,108 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a1628">
 <title>Charter Sealife</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <style>
-  :root{--navy:#1a5276;--navy-d:#123a54;--bg:#f4f7f9;--card:#ffffff;--text:#1c2b36;--muted:#6b7c88;--danger:#c0392b;--ok:#1e8449;}
-  *{box-sizing:border-box;}
-  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);}
-  .wrap{max-width:1000px;margin:0 auto;padding:24px;}
-  header{display:flex;justify-content:space-between;align-items:center;padding:16px 24px;background:var(--navy);color:#fff;}
-  header .brand{font-weight:700;font-size:18px;letter-spacing:.3px;}
-  header .who{font-size:13px;opacity:.85;text-align:right;}
-  header button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:6px 12px;border-radius:6px;cursor:pointer;font-size:13px;}
-  header button:hover{background:rgba(255,255,255,.28);}
-  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;}
-  .login-card{background:var(--card);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:36px;width:100%;max-width:380px;}
-  .login-card h1{font-size:20px;margin:0 0 4px;color:var(--navy);}
-  .login-card p.sub{color:var(--muted);font-size:13px;margin:0 0 24px;}
-  label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 4px;text-transform:uppercase;letter-spacing:.4px;}
-  input,select{width:100%;padding:10px 12px;border:1px solid #d7e0e6;border-radius:8px;font-size:15px;font-family:inherit;background:#fff;}
-  input:focus,select:focus{outline:none;border-color:var(--navy);}
-  .btn{display:inline-block;width:100%;margin-top:20px;padding:11px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;}
-  .btn:hover{background:var(--navy-d);}
-  .btn.secondary{background:transparent;color:var(--navy);border:1px solid var(--navy);}
-  .btn.secondary:hover{background:#eaf1f5;}
-  .toggle-link{display:block;text-align:center;margin-top:16px;font-size:13px;color:var(--navy);cursor:pointer;text-decoration:underline;}
-  .error{background:#fdecea;color:var(--danger);padding:10px 12px;border-radius:8px;font-size:13px;margin-top:14px;}
-  .tabs{display:flex;gap:4px;margin-top:8px;border-bottom:1px solid #dbe4ea;}
-  .tab-btn{background:none;border:none;padding:10px 16px;font-size:14px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;width:auto;}
-  .tab-btn.active{color:var(--navy);border-bottom-color:var(--navy);}
+  :root{
+    --navy:#0a1628;--deep:#0d1f3c;--ocean:#0e3460;--wave:#1a5276;--teal:#0e8a7a;
+    --gold:#c9a84c;--gold-light:#e8c96d;--foam:#e8f4f8;--white:#f0f4f8;
+    --text:#d0dce8;--muted:#7a93ad;--danger:#e74c3c;--ok:#27ae60;--warning:#f39c12;
+    --border:rgba(201,168,76,0.2);
+    --bg:#eaf2fb;--card:#ffffff;--dtext:#0d1f3c;--dmuted:#5a7090;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--dtext);min-height:100vh;}
+  .wrap{max-width:1000px;margin:0 auto;padding:20px 20px 88px;position:relative;z-index:1;}
+
+  /* ── APP HEADER ── */
+  header{display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1.25rem;background:rgba(13,31,60,0.97);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);}
+  header .brand{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:22px;letter-spacing:.5px;color:var(--gold);}
+  header .who{font-size:13px;color:var(--muted);text-align:right;}
+  header button{background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:var(--gold);padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.5px;}
+  header button:hover{background:rgba(201,168,76,0.28);}
+
+  /* ── LOGIN ── */
+  .center-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.5rem;background:var(--navy);position:relative;overflow:hidden;}
+  .center-screen::before{content:'';position:fixed;inset:0;z-index:0;
+    background: radial-gradient(ellipse at 20% 50%, rgba(14,52,96,0.6) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(14,138,122,0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 100%, rgba(10,22,40,0.8) 0%, transparent 60%);}
+  .login-card{background:rgba(13,31,60,0.55);border:1px solid var(--border);backdrop-filter:blur(10px);border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.4);padding:2rem 1.8rem 1.6rem;width:100%;max-width:400px;position:relative;z-index:1;}
+  .login-card .wordmark{text-align:center;margin-bottom:1.2rem;}
+  .login-card .wordmark i{font-size:2.4rem;color:var(--gold);filter:drop-shadow(0 0 20px rgba(201,168,76,0.4));animation:float 3s ease-in-out infinite;}
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  .login-card h1{font-family:'Cormorant Garamond',serif;font-size:1.9rem;font-weight:700;color:var(--text);letter-spacing:1.5px;text-align:center;margin:.4rem 0 0;}
+  .login-card h1 span{color:var(--gold);}
+  .login-card p.sub{color:var(--muted);font-size:13px;margin:.3rem 0 22px;text-align:center;letter-spacing:.5px;}
+  label{display:block;font-size:11px;font-weight:700;color:var(--muted);margin:14px 0 5px;text-transform:uppercase;letter-spacing:1.5px;}
+  input,select{width:100%;padding:11px 13px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:'Rajdhani',sans-serif;background:rgba(10,22,40,0.6);color:var(--text);}
+  input::placeholder{color:var(--muted);}
+  input:focus,select:focus{outline:none;border-color:var(--gold);}
+  select option{background:var(--deep);}
+  .btn{display:inline-block;width:100%;margin-top:22px;padding:12px;background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);border:none;border-radius:10px;font-size:15px;font-weight:700;letter-spacing:1.5px;cursor:pointer;font-family:'Rajdhani',sans-serif;}
+  .btn:hover{opacity:.9;transform:translateY(-1px);}
+  .btn.secondary{background:rgba(14,52,96,0.5);color:var(--text);border:1px solid var(--border);}
+  .btn.secondary:hover{border-color:var(--gold);color:var(--gold);}
+  .toggle-link{display:block;text-align:center;margin-top:16px;font-size:13px;color:var(--gold);cursor:pointer;letter-spacing:.3px;}
+  .error{background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,.35);color:#ff8a7a;padding:10px 12px;border-radius:8px;font-size:13px;margin-top:14px;}
+
+  /* ── BOTTOM NAV ── */
+  .tabs{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(13,31,60,0.98);border-top:1px solid var(--border);z-index:100;backdrop-filter:blur(20px);overflow-x:auto;}
+  .tab-btn{flex:1;background:none;border:none;padding:.8rem .5rem;display:flex;flex-direction:column;align-items:center;gap:.3rem;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;letter-spacing:.3px;width:auto;font-family:'Rajdhani',sans-serif;}
+  .tab-btn i{font-size:1.3rem;}
+  .tab-btn.active{color:var(--gold);}
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
+
+  /* ── CARDS ── */
   .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:20px;}
-  .item-card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06);border-left:5px solid var(--navy);}
-  .item-card h3{margin:0 0 6px;font-size:17px;}
-  .item-card .meta{font-size:12px;color:var(--muted);}
-  .item-card .badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:#eaf1f5;color:var(--navy);margin-top:6px;}
+  .item-card{background:var(--card);border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(0,60,120,.08);border:2px solid rgba(0,60,120,0.1);border-left:5px solid var(--gold);position:relative;transition:all .2s;}
+  .item-card:hover{transform:translateY(-1px);border-color:var(--gold);}
+  .item-card h3{margin:0 0 6px;font-size:17px;color:var(--dtext);}
+  .item-card .meta{font-size:12px;color:var(--dmuted);}
+  .item-card .badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(201,168,76,0.18);color:#a3833a;margin-top:6px;letter-spacing:.3px;}
   .item-card.inactive{opacity:.5;}
   .section-title{display:flex;justify-content:space-between;align-items:center;margin-top:20px;}
-  .section-title h2{font-size:16px;color:var(--navy);margin:0;}
-  .add-btn{background:var(--navy);color:#fff;border:none;padding:8px 14px;border-radius:7px;font-size:13px;cursor:pointer;width:auto;}
-  .add-btn:hover{background:var(--navy-d);}
-  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;}
-  .modal{background:#fff;border-radius:12px;padding:26px;width:100%;max-width:340px;}
-  .modal h3{margin:0 0 4px;color:var(--navy);}
+  .section-title h2{font-family:'Cormorant Garamond',serif;font-size:22px;color:var(--wave);margin:0;font-weight:700;}
+  .add-btn{background:linear-gradient(135deg,var(--gold),var(--gold-light));color:var(--navy);border:none;padding:9px 16px;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;width:auto;letter-spacing:.4px;font-family:'Rajdhani',sans-serif;}
+  .add-btn:hover{opacity:.9;}
+
+  /* ── MODAL ── */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px);}
+  .modal{background:var(--deep);border:1px solid var(--border);border-radius:16px;padding:1.6rem;width:100%;max-width:360px;color:var(--text);}
+  .modal h3{margin:0 0 4px;color:var(--gold);font-family:'Cormorant Garamond',serif;font-size:1.4rem;}
+  .modal label{color:var(--muted);}
   .modal-actions{display:flex;gap:10px;margin-top:18px;}
   .modal-actions .btn{margin-top:0;}
-  .empty-state{color:var(--muted);font-size:14px;padding:40px 0;text-align:center;}
+  .empty-state{color:var(--dmuted);font-size:14px;padding:40px 0;text-align:center;}
   .hidden{display:none !important;}
   .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-top:20px;}
-  .stat-card{background:var(--card);border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(0,0,0,.06);}
-  .stat-card .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
-  .stat-card .value{font-size:24px;font-weight:700;color:var(--navy);margin-top:6px;}
+  .stat-card{background:var(--card);border-radius:14px;padding:18px;box-shadow:0 2px 10px rgba(0,60,120,.08);border:1px solid rgba(0,60,120,0.08);}
+  .stat-card .label{font-size:12px;color:var(--dmuted);text-transform:uppercase;letter-spacing:.6px;font-weight:600;}
+  .stat-card .value{font-size:26px;font-weight:700;color:var(--wave);margin-top:6px;}
   .stat-card.pending .value{color:var(--danger);}
-  .status-pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;margin-top:6px;}
-  .status-pill.pendiente{background:#fdf3e0;color:#a86a00;}
-  .status-pill.parcial{background:#e8f0fb;color:#1a5276;}
-  .status-pill.pagado{background:#e6f6ec;color:var(--ok);}
-  .status-pill.cancelada{background:#fdecea;color:var(--danger);}
+  .status-pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;margin-top:6px;letter-spacing:.3px;}
+  .status-pill.pendiente{background:rgba(243,156,18,.18);color:#c07c0a;}
+  .status-pill.parcial{background:rgba(52,152,219,.18);color:#1a5276;}
+  .status-pill.pagado{background:rgba(39,174,96,.18);color:#1e8449;}
+  .status-pill.cancelada{background:rgba(231,76,60,.18);color:var(--danger);}
+
+  /* ── TOAST ── */
+  .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%) translateY(-100px);background:rgba(39,174,96,.95);color:#fff;padding:.75rem 1.5rem;border-radius:25px;font-weight:600;font-size:14px;z-index:9999;transition:transform .3s;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+  .toast.show{transform:translateX(-50%) translateY(0);}
+  .toast.error{background:rgba(231,76,60,.95);}
 </style>
 </head>
 <body>
 
 <div id="loginScreen" class="center-screen">
   <div class="login-card">
-    <h1>Charter Sealife</h1>
+    <div class="wordmark"><i class="fa-solid fa-anchor"></i></div>
+    <h1>Charter <span>Sealife</span></h1>
     <p class="sub" id="loginSub">Entra con el código de tu empresa y tu PIN.</p>
 
     <div id="loginForm">
@@ -106,10 +145,10 @@
   </header>
   <div class="wrap">
     <div class="tabs" id="tabBar">
-      <button class="tab-btn active" onclick="switchTab('barcos')">Barcos</button>
-      <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')">Equipo</button>
-      <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')">Vendedores</button>
-      <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')">Reportes</button>
+      <button class="tab-btn active" onclick="switchTab('barcos')"><i class="fa-solid fa-ship"></i>Barcos</button>
+      <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')"><i class="fa-solid fa-users"></i>Equipo</button>
+      <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')"><i class="fa-solid fa-star"></i>Vendedores</button>
+      <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')"><i class="fa-solid fa-chart-bar"></i>Reportes</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel active">
@@ -261,6 +300,8 @@
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <div id="registerPaymentModal" class="modal-bg hidden">
   <div class="modal">
     <h3>Registrar pago</h3>
@@ -321,6 +362,15 @@ function showError(msg){
   el.classList.remove('hidden');
 }
 function hideError(){ document.getElementById('loginError').classList.add('hidden'); }
+
+let toastTimer = null;
+function showToast(msg, type){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type === 'error' ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove('show'); }, 2600);
+}
 
 async function doLogin(){
   hideError();
@@ -414,7 +464,7 @@ async function startCheckout(){
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'error');
     window.location.href = data.url;
-  }catch(e){ alert('No se pudo iniciar el pago: ' + e.message); }
+  }catch(e){ showToast('No se pudo iniciar el pago: ' + e.message, 'error'); }
 }
 
 async function openPortal(){
@@ -427,7 +477,7 @@ async function openPortal(){
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || 'error');
     window.location.href = data.url;
-  }catch(e){ alert('No se pudo abrir el portal de suscripción: ' + e.message); }
+  }catch(e){ showToast('No se pudo abrir el portal de suscripción: ' + e.message, 'error'); }
 }
 
 async function refreshSubscriptionThenRoute(){
@@ -634,7 +684,8 @@ async function submitRegisterPayment(){
     closeModal('registerPaymentModal');
     closeModal('vendorDetailModal');
     await loadReports();
-  }catch(e){ alert('Error al registrar pago: ' + e.message); }
+    showToast('Pago registrado');
+  }catch(e){ showToast('Error al registrar pago: ' + e.message, 'error'); }
 }
 
 function escapeHtml(s){
@@ -663,7 +714,8 @@ async function submitAddBoat(){
       headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
       body: JSON.stringify({ token: session.token })
     }).catch(() => {});
-  }catch(e){ alert('Error al crear barco: ' + e.message); }
+    showToast('Barco agregado ⚓');
+  }catch(e){ showToast('Error al crear barco: ' + e.message, 'error'); }
 }
 
 async function submitAddUser(){
@@ -677,9 +729,10 @@ async function submitAddUser(){
     document.getElementById('newUserName').value = '';
     document.getElementById('newUserPin').value = '';
     await loadUsers();
+    showToast('Persona agregada al equipo');
   }catch(e){
     const map = { pin_taken: 'Ese PIN ya está en uso en tu empresa, elige otro.' };
-    alert('Error al agregar: ' + (map[e.message] || e.message));
+    showToast('Error al agregar: ' + (map[e.message] || e.message), 'error');
   }
 }
 
@@ -694,9 +747,10 @@ async function submitAddVendor(){
     document.getElementById('newVendorName').value = '';
     document.getElementById('newVendorPin').value = '';
     await loadVendors();
+    showToast('Vendedor agregado');
   }catch(e){
     const map = { pin_taken: 'Ese PIN ya está en uso en tu empresa, elige otro.' };
-    alert('Error al agregar: ' + (map[e.message] || e.message));
+    showToast('Error al agregar: ' + (map[e.message] || e.message), 'error');
   }
 }
 
@@ -779,7 +833,8 @@ async function submitAddReservation(){
     document.getElementById('newResHours').value = '';
     document.getElementById('newResAmount').value = '';
     await loadMyReservations();
-  }catch(e){ alert('Error al reservar: ' + e.message); }
+    showToast('Reserva creada 🚤');
+  }catch(e){ showToast('Error al reservar: ' + e.message, 'error'); }
 }
 
 (function init(){
