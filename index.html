@@ -285,6 +285,30 @@
   </div>
 </div>
 
+<div id="mecanicoScreen" class="hidden">
+  <header>
+    <div class="brand" id="mecanicoCompanyLabel">Charter Sealife</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="who" id="mecanicoWhoLabel"></div>
+      <button onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="section-title">
+      <h2>Fallas reportadas</h2>
+    </div>
+    <div id="mecFaultsGrid" class="cards-grid"></div>
+    <div id="mecFaultsEmpty" class="empty-state hidden">Sin fallas reportadas.</div>
+
+    <div class="section-title" style="margin-top:22px;">
+      <h2>Mis pedidos de refacciones</h2>
+      <button class="add-btn" onclick="openAddPartsOrder()">+ Pedir refacción</button>
+    </div>
+    <div id="partsOrdersGrid" class="cards-grid"></div>
+    <div id="partsOrdersEmpty" class="empty-state hidden">Todavía no hay pedidos de refacciones.</div>
+  </div>
+</div>
+
 <div id="blockedScreen" class="center-screen hidden">
   <div class="login-card">
     <h1>Suscripción requerida</h1>
@@ -432,6 +456,27 @@
   </div>
 </div>
 
+<div id="addPartsOrderModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Pedir refacción</h3>
+    <label>Barco</label>
+    <select id="newPartsBoat"></select>
+    <label>Refacción</label>
+    <input id="newPartsName" placeholder="ej. Filtro de aceite">
+    <label>Cantidad</label>
+    <input id="newPartsQuantity" type="number" min="1" step="1" value="1">
+    <label>Urgencia</label>
+    <select id="newPartsUrgency">
+      <option value="normal">Normal</option>
+      <option value="urgente">Urgente</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addPartsOrderModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddPartsOrder()">Pedir</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://znkmryggkbirrmvybogo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_tpWZEqgBbMmFEGDBgWZCnQ_j0uuLIIu';
@@ -527,6 +572,7 @@ function doLogout(){
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.add('hidden');
   document.getElementById('capitanScreen').classList.add('hidden');
+  document.getElementById('mecanicoScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginSlug').value = '';
@@ -558,6 +604,8 @@ function routeToScreen(){
     enterVendorView();
   } else if (session.role === 'capitan') {
     enterCapitanView();
+  } else if (session.role === 'mecanico') {
+    enterMecanicoView();
   } else {
     enterDashboard();
   }
@@ -567,6 +615,7 @@ function enterBlocked(){
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.add('hidden');
   document.getElementById('capitanScreen').classList.add('hidden');
+  document.getElementById('mecanicoScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.remove('hidden');
   const isAdmin = session.role === 'administrador';
   document.getElementById('blockedMsg').textContent = isAdmin
@@ -616,6 +665,7 @@ async function refreshSubscriptionThenRoute(){
 async function enterDashboard(){
   document.getElementById('vendorScreen').classList.add('hidden');
   document.getElementById('capitanScreen').classList.add('hidden');
+  document.getElementById('mecanicoScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('dashboardScreen').classList.remove('hidden');
   document.getElementById('companyNameLabel').textContent = session.company_name || 'Charter Sealife';
@@ -989,6 +1039,8 @@ async function submitAddVendor(){
 
 async function enterVendorView(){
   document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('capitanScreen').classList.add('hidden');
+  document.getElementById('mecanicoScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.remove('hidden');
   document.getElementById('vendorCompanyLabel').textContent = session.company_name || 'Charter Sealife';
@@ -1108,6 +1160,7 @@ let capCalState = { month: today.getMonth(), year: today.getFullYear(), reservat
 async function enterCapitanView(){
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('mecanicoScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('capitanScreen').classList.remove('hidden');
   document.getElementById('capitanCompanyLabel').textContent = session.company_name || 'Charter Sealife';
@@ -1266,6 +1319,115 @@ async function submitAddFault(){
     await loadMyFaults();
     showToast('Falla reportada');
   }catch(e){ showToast('Error al reportar falla: ' + e.message, 'error'); }
+}
+
+// ===== Vista de mecánico =====
+
+async function enterMecanicoView(){
+  document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('capitanScreen').classList.add('hidden');
+  document.getElementById('blockedScreen').classList.add('hidden');
+  document.getElementById('mecanicoScreen').classList.remove('hidden');
+  document.getElementById('mecanicoCompanyLabel').textContent = session.company_name || 'Charter Sealife';
+  document.getElementById('mecanicoWhoLabel').textContent = `${session.name} · Mecánico`;
+
+  try{
+    const boats = await callRpc('list_boats', { p_token: session.token });
+    boatsById = {};
+    boats.forEach(b => boatsById[b.id] = b.name);
+    const sel = document.getElementById('newPartsBoat');
+    sel.innerHTML = boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  }catch(e){}
+
+  await loadAllFaults();
+  await loadMyPartsOrders();
+}
+
+async function loadAllFaults(){
+  const grid = document.getElementById('mecFaultsGrid');
+  const empty = document.getElementById('mecFaultsEmpty');
+  grid.innerHTML = '';
+  try{
+    const faults = await callRpc('list_faults', { p_token: session.token });
+    if (!faults.length){ empty.textContent = 'Sin fallas reportadas.'; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    faults.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `<h3>${escapeHtml(boatsById[f.boat_id] || 'Barco')}</h3>
+        <div class="meta">${escapeHtml(f.description)}</div>
+        <div class="meta">${fmtDateTime(f.created_at)}</div>
+        <span class="status-pill ${f.status}">${faultStatusLabel(f.status)}</span>
+        <div style="margin-top:8px;">
+          <select onchange="changeFaultStatus('${f.id}', this.value)">
+            <option value="pendiente" ${f.status==='pendiente'?'selected':''}>Pendiente</option>
+            <option value="en_proceso" ${f.status==='en_proceso'?'selected':''}>En proceso</option>
+            <option value="resuelto" ${f.status==='resuelto'?'selected':''}>Resuelto</option>
+          </select>
+        </div>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudieron cargar las fallas: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+async function changeFaultStatus(faultId, status){
+  try{
+    await callRpc('update_fault_status', { p_token: session.token, p_fault_id: faultId, p_status: status });
+    showToast('Estado actualizado');
+    await loadAllFaults();
+  }catch(e){ showToast('Error al actualizar: ' + e.message, 'error'); }
+}
+
+async function loadMyPartsOrders(){
+  const grid = document.getElementById('partsOrdersGrid');
+  const empty = document.getElementById('partsOrdersEmpty');
+  grid.innerHTML = '';
+  try{
+    const orders = await callRpc('list_parts_orders', { p_token: session.token });
+    if (!orders.length){ empty.textContent = 'Todavía no hay pedidos de refacciones.'; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    orders.forEach(o => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `<h3>${escapeHtml(o.part_name)}</h3>
+        <div class="meta">${escapeHtml(boatsById[o.boat_id] || 'Barco')} · cantidad ${o.quantity}</div>
+        <div class="meta">${o.urgency === 'urgente' ? 'Urgente' : 'Normal'} · ${fmtDateTime(o.created_at)}</div>
+        <span class="status-pill ${o.status === 'recibido' ? 'pagado' : (o.status === 'ordenado' ? 'parcial' : 'pendiente')}">${partsStatusLabel(o.status)}</span>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudieron cargar los pedidos: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+function partsStatusLabel(s){
+  return { pendiente:'Pendiente', ordenado:'Ordenado', recibido:'Recibido' }[s] || s;
+}
+
+function openAddPartsOrder(){
+  document.getElementById('newPartsName').value = '';
+  document.getElementById('newPartsQuantity').value = '1';
+  document.getElementById('newPartsUrgency').value = 'normal';
+  openModal('addPartsOrderModal');
+}
+
+async function submitAddPartsOrder(){
+  const boatId = document.getElementById('newPartsBoat').value;
+  const partName = document.getElementById('newPartsName').value.trim();
+  const quantity = Number(document.getElementById('newPartsQuantity').value) || 1;
+  const urgency = document.getElementById('newPartsUrgency').value;
+  if (!boatId || !partName) return alert('Elige barco y describe la refacción.');
+  try{
+    await callRpc('create_parts_order', { p_token: session.token, p_boat_id: boatId, p_part_name: partName, p_quantity: quantity, p_urgency: urgency });
+    closeModal('addPartsOrderModal');
+    await loadMyPartsOrders();
+    showToast('Pedido de refacción enviado');
+  }catch(e){ showToast('Error al pedir refacción: ' + e.message, 'error'); }
 }
 
 (function init(){
