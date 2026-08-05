@@ -98,6 +98,7 @@
   <header>
     <div class="brand" id="companyNameLabel">Charter Sealife</div>
     <div style="display:flex;align-items:center;gap:14px;">
+      <button class="hidden" id="subscribeHeaderBtn" onclick="startCheckout()"></button>
       <div class="who" id="whoLabel"></div>
       <button onclick="doLogout()">Salir</button>
     </div>
@@ -164,6 +165,15 @@
     </div>
     <div id="reservationsGrid" class="cards-grid"></div>
     <div id="reservationsEmpty" class="empty-state hidden">Todavía no tienes reservas. Crea la primera.</div>
+  </div>
+</div>
+
+<div id="blockedScreen" class="center-screen hidden">
+  <div class="login-card">
+    <h1>Suscripción requerida</h1>
+    <p class="sub" id="blockedMsg"></p>
+    <button class="btn hidden" id="subscribeBtn" onclick="startCheckout()">Suscribirme ($500 MXN/barco/mes)</button>
+    <span class="toggle-link" onclick="doLogout()">Salir</span>
   </div>
 </div>
 
@@ -267,6 +277,7 @@
 const SUPABASE_URL = 'https://znkmryggkbirrmvybogo.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_tpWZEqgBbMmFEGDBgWZCnQ_j0uuLIIu';
 const RPC = (fn) => `${SUPABASE_URL}/rest/v1/rpc/${fn}`;
+const EDGE = (fn) => `${SUPABASE_URL}/functions/v1/${fn}`;
 const SESSION_KEY = 'cs_session';
 
 let session = null;
@@ -347,13 +358,33 @@ function doLogout(){
   loadedTabs.clear();
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginSlug').value = '';
   document.getElementById('loginPin').value = '';
 }
 
+function subscriptionAllowed(s){
+  if (!s) return false;
+  if (s.subscription_status === 'active' || s.subscription_status === 'trialing') return true;
+  if (s.subscription_status === 'trial') {
+    if (!s.trial_ends_at) return true;
+    return new Date(s.trial_ends_at) > new Date();
+  }
+  return false;
+}
+
+function daysLeft(dateStr){
+  const ms = new Date(dateStr) - new Date();
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+
 function routeToScreen(){
   document.getElementById('loginScreen').classList.add('hidden');
+  if (!subscriptionAllowed(session)) {
+    enterBlocked();
+    return;
+  }
   if (session.role === 'vendedor') {
     enterVendorView();
   } else {
@@ -361,8 +392,45 @@ function routeToScreen(){
   }
 }
 
+function enterBlocked(){
+  document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('blockedScreen').classList.remove('hidden');
+  const isAdmin = session.role === 'administrador';
+  document.getElementById('blockedMsg').textContent = isAdmin
+    ? 'Tu periodo de prueba terminó o tu suscripción no está activa. Suscríbete para seguir usando Charter Sealife.'
+    : 'La suscripción de tu empresa no está activa. Contacta a tu administrador.';
+  document.getElementById('subscribeBtn').classList.toggle('hidden', !isAdmin);
+}
+
+async function startCheckout(){
+  try{
+    const res = await fetch(EDGE('create-checkout-session'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token: session.token })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || 'error');
+    window.location.href = data.url;
+  }catch(e){ alert('No se pudo iniciar el pago: ' + e.message); }
+}
+
+async function refreshSubscriptionThenRoute(){
+  try{
+    const data = await callRpc('get_subscription_status', { p_token: session.token });
+    session.subscription_status = data.subscription_status;
+    session.trial_ends_at = data.trial_ends_at;
+    session.current_period_end = data.current_period_end;
+    saveSession(session);
+  }catch(e){}
+  window.history.replaceState({}, '', window.location.pathname);
+  routeToScreen();
+}
+
 async function enterDashboard(){
   document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('dashboardScreen').classList.remove('hidden');
   document.getElementById('companyNameLabel').textContent = session.company_name || 'Charter Sealife';
   document.getElementById('whoLabel').textContent = `${session.name} · ${roleLabel(session.role)}`;
@@ -371,6 +439,15 @@ async function enterDashboard(){
   document.getElementById('tabBtnEquipo').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnVendedores').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnReportes').classList.toggle('hidden', !isAdmin);
+  const subBtn = document.getElementById('subscribeHeaderBtn');
+  if (isAdmin && session.subscription_status !== 'active') {
+    subBtn.classList.remove('hidden');
+    subBtn.textContent = (session.subscription_status === 'trial' && session.trial_ends_at)
+      ? `Suscribirme (prueba: ${daysLeft(session.trial_ends_at)}d)`
+      : 'Suscribirme';
+  } else {
+    subBtn.classList.add('hidden');
+  }
   switchTab('barcos');
 }
 
@@ -565,6 +642,11 @@ async function submitAddBoat(){
     closeModal('addBoatModal');
     document.getElementById('newBoatName').value = '';
     await loadBoats();
+    fetch(EDGE('sync-subscription-quantity'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+      body: JSON.stringify({ token: session.token })
+    }).catch(() => {});
   }catch(e){ alert('Error al crear barco: ' + e.message); }
 }
 
@@ -606,6 +688,7 @@ async function submitAddVendor(){
 
 async function enterVendorView(){
   document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.remove('hidden');
   document.getElementById('vendorCompanyLabel').textContent = session.company_name || 'Charter Sealife';
   const typeLabel = session.vendor_type === 'empresa_credito' ? 'Empresa con crédito' : 'Vendedor directo';
@@ -688,7 +771,12 @@ async function submitAddReservation(){
   if (saved){
     try{
       session = JSON.parse(saved);
-      routeToScreen();
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('checkout')) {
+        refreshSubscriptionThenRoute();
+      } else {
+        routeToScreen();
+      }
       return;
     }catch(e){ localStorage.removeItem(SESSION_KEY); }
   }
