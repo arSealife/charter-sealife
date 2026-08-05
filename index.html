@@ -92,6 +92,8 @@
   .status-pill.parcial{background:rgba(52,152,219,.18);color:#1a5276;}
   .status-pill.pagado{background:rgba(39,174,96,.18);color:#1e8449;}
   .status-pill.cancelada{background:rgba(231,76,60,.18);color:var(--danger);}
+  .status-pill.en_proceso{background:rgba(52,152,219,.18);color:#1a5276;}
+  .status-pill.resuelto{background:rgba(39,174,96,.18);color:#1e8449;}
 
   /* ── CALENDAR ── */
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px;}
@@ -194,7 +196,7 @@
     <div id="panelEquipo" class="tab-panel">
       <div class="section-title">
         <h2>Equipo</h2>
-        <button class="add-btn" onclick="openModal('addUserModal')">+ Agregar persona</button>
+        <button class="add-btn" onclick="openAddUserModal()">+ Agregar persona</button>
       </div>
       <div id="usersGrid" class="cards-grid"></div>
       <div id="usersEmpty" class="empty-state hidden">Todavía no hay equipo. Agrega el primero.</div>
@@ -246,6 +248,43 @@
   </div>
 </div>
 
+<div id="capitanScreen" class="hidden">
+  <header>
+    <div class="brand" id="capitanCompanyLabel">Charter Sealife</div>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div class="who" id="capitanWhoLabel"></div>
+      <button onclick="doLogout()">Salir</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="section-title">
+      <h2>Mi barco</h2>
+    </div>
+    <div id="capitanBoatCard" class="cards-grid"></div>
+
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="changeCapCalMonth(-1)">◀</button>
+      <div class="cal-month-label" id="capCalMonthLabel"></div>
+      <button class="cal-nav-btn" onclick="changeCapCalMonth(1)">▶</button>
+    </div>
+    <div class="cal-grid" id="capCalGrid"></div>
+
+    <div class="section-title" style="margin-top:22px;">
+      <h2>Viajes</h2>
+      <button class="add-btn" onclick="openAddTrip()">+ Registrar viaje</button>
+    </div>
+    <div id="tripsGrid" class="cards-grid"></div>
+    <div id="tripsEmpty" class="empty-state hidden">Todavía no hay viajes registrados.</div>
+
+    <div class="section-title" style="margin-top:22px;">
+      <h2>Fallas reportadas</h2>
+      <button class="add-btn" onclick="openAddFault()">+ Reportar falla</button>
+    </div>
+    <div id="faultsGrid" class="cards-grid"></div>
+    <div id="faultsEmpty" class="empty-state hidden">Sin fallas reportadas.</div>
+  </div>
+</div>
+
 <div id="blockedScreen" class="center-screen hidden">
   <div class="login-card">
     <h1>Suscripción requerida</h1>
@@ -275,13 +314,15 @@
     <label>Nombre</label>
     <input id="newUserName" placeholder="ej. Juan Pérez">
     <label>Puesto</label>
-    <select id="newUserRole">
+    <select id="newUserRole" onchange="toggleNewUserBoatField()">
       <option value="capitan">Capitán</option>
       <option value="mecanico">Mecánico</option>
       <option value="comprador">Comprador</option>
       <option value="reservas">Reservas</option>
       <option value="administrador">Administrador</option>
     </select>
+    <label id="newUserBoatLabel" class="hidden">Barco asignado</label>
+    <select id="newUserBoat" class="hidden"></select>
     <label>PIN</label>
     <input id="newUserPin" type="password" inputmode="numeric" placeholder="4 dígitos">
     <div class="modal-actions">
@@ -349,6 +390,44 @@
     <div class="modal-actions">
       <button class="btn secondary" style="flex:1" onclick="closeModal('registerPaymentModal')">Cancelar</button>
       <button class="btn" style="flex:1" onclick="submitRegisterPayment()">Guardar pago</button>
+    </div>
+  </div>
+</div>
+
+<div id="addTripModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Registrar viaje</h3>
+    <label>Salida</label>
+    <input id="newTripDeparture" type="datetime-local">
+    <label>Llegada</label>
+    <input id="newTripArrival" type="datetime-local">
+    <label>Horas de motor (inicio)</label>
+    <input id="newTripEngineStart" type="number" step="0.1" min="0" placeholder="ej. 1024.5">
+    <label>Horas de motor (fin)</label>
+    <input id="newTripEngineEnd" type="number" step="0.1" min="0" placeholder="ej. 1028.0">
+    <label>Combustible inicial (%)</label>
+    <input id="newTripFuelStart" type="number" step="1" min="0" max="100" placeholder="ej. 80">
+    <label>Combustible final (%)</label>
+    <input id="newTripFuelEnd" type="number" step="1" min="0" max="100" placeholder="ej. 40">
+    <label>Combustible cargado (L)</label>
+    <input id="newTripFuelAmount" type="number" step="1" min="0" placeholder="ej. 50">
+    <label>Notas</label>
+    <input id="newTripNotes" placeholder="Observaciones del viaje">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addTripModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddTrip()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div id="addFaultModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Reportar falla</h3>
+    <label>Descripción</label>
+    <input id="newFaultDescription" placeholder="ej. Motor pierde potencia a bajas RPM">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addFaultModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddFault()">Reportar</button>
     </div>
   </div>
 </div>
@@ -447,6 +526,7 @@ function doLogout(){
   loadedTabs.clear();
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('capitanScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('loginScreen').classList.remove('hidden');
   document.getElementById('loginSlug').value = '';
@@ -476,6 +556,8 @@ function routeToScreen(){
   }
   if (session.role === 'vendedor') {
     enterVendorView();
+  } else if (session.role === 'capitan') {
+    enterCapitanView();
   } else {
     enterDashboard();
   }
@@ -484,6 +566,7 @@ function routeToScreen(){
 function enterBlocked(){
   document.getElementById('dashboardScreen').classList.add('hidden');
   document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('capitanScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.remove('hidden');
   const isAdmin = session.role === 'administrador';
   document.getElementById('blockedMsg').textContent = isAdmin
@@ -532,6 +615,7 @@ async function refreshSubscriptionThenRoute(){
 
 async function enterDashboard(){
   document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('capitanScreen').classList.add('hidden');
   document.getElementById('blockedScreen').classList.add('hidden');
   document.getElementById('dashboardScreen').classList.remove('hidden');
   document.getElementById('companyNameLabel').textContent = session.company_name || 'Charter Sealife';
@@ -817,6 +901,16 @@ function statusLabel(s){
   return { pendiente:'Pendiente', parcial:'Parcial', pagado:'Pagado', pre_reserva:'Pre-reserva', cancelada:'Cancelada' }[s] || s;
 }
 
+function faultStatusLabel(s){
+  return { pendiente:'Pendiente', en_proceso:'En proceso', resuelto:'Resuelto' }[s] || s;
+}
+
+function fmtDateTime(s){
+  if (!s) return '-';
+  const d = new Date(s);
+  return d.toLocaleString('es-MX', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
 async function submitAddBoat(){
   const name = document.getElementById('newBoatName').value.trim();
   const color = document.getElementById('newBoatColor').value;
@@ -835,20 +929,40 @@ async function submitAddBoat(){
   }catch(e){ showToast('Error al crear barco: ' + e.message, 'error'); }
 }
 
+async function openAddUserModal(){
+  document.getElementById('newUserName').value = '';
+  document.getElementById('newUserPin').value = '';
+  document.getElementById('newUserRole').value = 'capitan';
+  try{
+    const boats = await callRpc('list_boats', { p_token: session.token });
+    const sel = document.getElementById('newUserBoat');
+    sel.innerHTML = '<option value="">Sin asignar</option>' + boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  }catch(e){}
+  toggleNewUserBoatField();
+  openModal('addUserModal');
+}
+
+function toggleNewUserBoatField(){
+  const isCap = document.getElementById('newUserRole').value === 'capitan';
+  document.getElementById('newUserBoatLabel').classList.toggle('hidden', !isCap);
+  document.getElementById('newUserBoat').classList.toggle('hidden', !isCap);
+}
+
 async function submitAddUser(){
   const name = document.getElementById('newUserName').value.trim();
   const role = document.getElementById('newUserRole').value;
   const pin = document.getElementById('newUserPin').value.trim();
+  const boatId = role === 'capitan' ? (document.getElementById('newUserBoat').value || null) : null;
   if (!name || !pin) return alert('Completa nombre y PIN.');
   try{
-    await callRpc('create_user', { p_token: session.token, p_name: name, p_role: role, p_pin: pin });
+    await callRpc('create_user', { p_token: session.token, p_name: name, p_role: role, p_pin: pin, p_boat_id: boatId });
     closeModal('addUserModal');
     document.getElementById('newUserName').value = '';
     document.getElementById('newUserPin').value = '';
     await loadUsers();
     showToast('Persona agregada al equipo');
   }catch(e){
-    const map = { pin_taken: 'Ese PIN ya está en uso en tu empresa, elige otro.' };
+    const map = { pin_taken: 'Ese PIN ya está en uso en tu empresa, elige otro.', invalid_boat: 'El barco seleccionado no es válido.' };
     showToast('Error al agregar: ' + (map[e.message] || e.message), 'error');
   }
 }
@@ -984,6 +1098,174 @@ async function submitAddReservation(){
     await loadMyReservations();
     showToast('Reserva creada 🚤');
   }catch(e){ showToast('Error al reservar: ' + e.message, 'error'); }
+}
+
+// ===== Vista de capitán =====
+
+let capBoat = null;
+let capCalState = { month: today.getMonth(), year: today.getFullYear(), reservations: [] };
+
+async function enterCapitanView(){
+  document.getElementById('dashboardScreen').classList.add('hidden');
+  document.getElementById('vendorScreen').classList.add('hidden');
+  document.getElementById('blockedScreen').classList.add('hidden');
+  document.getElementById('capitanScreen').classList.remove('hidden');
+  document.getElementById('capitanCompanyLabel').textContent = session.company_name || 'Charter Sealife';
+  document.getElementById('capitanWhoLabel').textContent = `${session.name} · Capitán`;
+
+  const boatCard = document.getElementById('capitanBoatCard');
+  try{
+    const boats = await callRpc('list_boats', { p_token: session.token });
+    boatsById = {};
+    boats.forEach(b => boatsById[b.id] = b.name);
+    capBoat = session.boat_id ? boats.find(b => b.id === session.boat_id) : null;
+    boatCard.innerHTML = capBoat
+      ? `<div class="item-card" style="border-left-color:${capBoat.color||'#1a5276'};"><h3>${escapeHtml(capBoat.name)}</h3><div class="meta">${capBoat.tracker_id ? 'GPS vinculado' : 'Sin GPS configurado'}</div></div>`
+      : `<div class="empty-state">No tienes un barco asignado. Contacta a tu administrador.</div>`;
+  }catch(e){
+    boatCard.innerHTML = `<div class="empty-state">No se pudo cargar tu barco: ${escapeHtml(e.message)}</div>`;
+  }
+
+  try{
+    const reservations = capBoat ? await callRpc('list_reservations', { p_token: session.token }) : [];
+    capCalState.reservations = capBoat ? reservations.filter(r => r.boat_id === capBoat.id) : [];
+  }catch(e){ capCalState.reservations = []; }
+  renderCapCalendar();
+
+  await loadMyTrips();
+  await loadMyFaults();
+}
+
+function renderCapCalendar(){
+  const { month, year, reservations } = capCalState;
+  document.getElementById('capCalMonthLabel').textContent = `${MONTH_NAMES[month]} ${year}`;
+  document.getElementById('capCalGrid').innerHTML = buildCalGrid(month, year, reservations, capBoat ? [capBoat] : [], 'showCapCalDay');
+}
+
+function changeCapCalMonth(dir){
+  capCalState.month += dir;
+  if (capCalState.month > 11) { capCalState.month = 0; capCalState.year++; }
+  if (capCalState.month < 0) { capCalState.month = 11; capCalState.year--; }
+  renderCapCalendar();
+}
+
+function showCapCalDay(dateStr){
+  const dayRes = capCalState.reservations.filter(r => r.reservation_date === dateStr);
+  document.getElementById('vendorDetailTitle').textContent = dateStr;
+  const box = document.getElementById('vendorDetailList');
+  box.innerHTML = dayRes.map(r => {
+    return `<div class="item-card" style="margin-bottom:10px;">
+      <h3>${escapeHtml(capBoat ? capBoat.name : 'Barco')}</h3>
+      <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)}</div>
+      <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
+    </div>`;
+  }).join('') || '<div class="empty-state">Sin reservas este día.</div>';
+  openModal('vendorDetailModal');
+}
+
+async function loadMyTrips(){
+  const grid = document.getElementById('tripsGrid');
+  const empty = document.getElementById('tripsEmpty');
+  grid.innerHTML = '';
+  try{
+    const trips = await callRpc('list_trips', { p_token: session.token });
+    if (!trips.length){ empty.textContent = 'Todavía no hay viajes registrados.'; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    trips.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      const hours = (t.engine_hours_start != null && t.engine_hours_end != null) ? `${t.engine_hours_end - t.engine_hours_start} hrs motor` : '';
+      card.innerHTML = `<h3>${fmtDateTime(t.departure_time)}</h3>
+        <div class="meta">${t.arrival_time ? 'Llegada: ' + fmtDateTime(t.arrival_time) : 'En curso'}</div>
+        ${hours ? `<div class="meta">${hours}</div>` : ''}
+        ${t.fuel_amount ? `<div class="meta">Combustible cargado: ${t.fuel_amount} L</div>` : ''}
+        ${t.notes ? `<div class="meta">${escapeHtml(t.notes)}</div>` : ''}`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudieron cargar los viajes: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+function openAddTrip(){
+  document.getElementById('newTripDeparture').value = '';
+  document.getElementById('newTripArrival').value = '';
+  document.getElementById('newTripEngineStart').value = '';
+  document.getElementById('newTripEngineEnd').value = '';
+  document.getElementById('newTripFuelStart').value = '';
+  document.getElementById('newTripFuelEnd').value = '';
+  document.getElementById('newTripFuelAmount').value = '';
+  document.getElementById('newTripNotes').value = '';
+  openModal('addTripModal');
+}
+
+async function submitAddTrip(){
+  if (!capBoat) return showToast('No tienes un barco asignado.', 'error');
+  const departure = document.getElementById('newTripDeparture').value;
+  const arrival = document.getElementById('newTripArrival').value;
+  const engineStart = document.getElementById('newTripEngineStart').value;
+  const engineEnd = document.getElementById('newTripEngineEnd').value;
+  const fuelStart = document.getElementById('newTripFuelStart').value;
+  const fuelEnd = document.getElementById('newTripFuelEnd').value;
+  const fuelAmount = document.getElementById('newTripFuelAmount').value;
+  const notes = document.getElementById('newTripNotes').value.trim();
+  try{
+    await callRpc('create_trip', {
+      p_token: session.token,
+      p_boat_id: capBoat.id,
+      p_departure_time: departure ? new Date(departure).toISOString() : null,
+      p_arrival_time: arrival ? new Date(arrival).toISOString() : null,
+      p_engine_hours_start: engineStart ? Number(engineStart) : null,
+      p_engine_hours_end: engineEnd ? Number(engineEnd) : null,
+      p_fuel_start: fuelStart ? Number(fuelStart) : null,
+      p_fuel_end: fuelEnd ? Number(fuelEnd) : null,
+      p_fuel_amount: fuelAmount ? Number(fuelAmount) : null,
+      p_notes: notes || null
+    });
+    closeModal('addTripModal');
+    await loadMyTrips();
+    showToast('Viaje registrado ⚓');
+  }catch(e){ showToast('Error al registrar viaje: ' + e.message, 'error'); }
+}
+
+async function loadMyFaults(){
+  const grid = document.getElementById('faultsGrid');
+  const empty = document.getElementById('faultsEmpty');
+  grid.innerHTML = '';
+  try{
+    const faults = await callRpc('list_faults', { p_token: session.token });
+    if (!faults.length){ empty.textContent = 'Sin fallas reportadas.'; empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    faults.forEach(f => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `<h3>${escapeHtml(f.description)}</h3>
+        <div class="meta">${fmtDateTime(f.created_at)}</div>
+        <span class="status-pill ${f.status}">${faultStatusLabel(f.status)}</span>`;
+      grid.appendChild(card);
+    });
+  }catch(e){
+    empty.textContent = 'No se pudieron cargar las fallas: ' + e.message;
+    empty.classList.remove('hidden');
+  }
+}
+
+function openAddFault(){
+  if (!capBoat) return showToast('No tienes un barco asignado.', 'error');
+  document.getElementById('newFaultDescription').value = '';
+  openModal('addFaultModal');
+}
+
+async function submitAddFault(){
+  const description = document.getElementById('newFaultDescription').value.trim();
+  if (!description) return alert('Describe la falla.');
+  try{
+    await callRpc('create_fault', { p_token: session.token, p_boat_id: capBoat.id, p_description: description });
+    closeModal('addFaultModal');
+    await loadMyFaults();
+    showToast('Falla reportada');
+  }catch(e){ showToast('Error al reportar falla: ' + e.message, 'error'); }
 }
 
 (function init(){
