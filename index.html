@@ -93,6 +93,23 @@
   .status-pill.pagado{background:rgba(39,174,96,.18);color:#1e8449;}
   .status-pill.cancelada{background:rgba(231,76,60,.18);color:var(--danger);}
 
+  /* ── CALENDAR ── */
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px;}
+  .cal-dow{font-size:11px;color:var(--dmuted);text-align:center;font-weight:700;padding:4px 0;}
+  .cal-day{background:var(--card);border-radius:8px;min-height:60px;padding:4px 3px;cursor:pointer;border:1px solid rgba(0,60,120,0.08);display:flex;flex-direction:column;align-items:center;gap:2px;box-sizing:border-box;overflow:hidden;}
+  .cal-day.today{border:2px solid var(--gold);}
+  .cal-day.empty{background:transparent;border:none;cursor:default;}
+  .cal-daynum{font-size:11px;color:var(--dmuted);font-weight:600;align-self:flex-start;}
+  .cal-day.today .cal-daynum{color:var(--gold);}
+  .cal-chip{font-size:9px;font-weight:700;border-radius:3px;padding:1px 3px;text-align:center;width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
+  .cal-more{font-size:9px;color:var(--dmuted);}
+  .cal-nav{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;}
+  .cal-nav-btn{background:rgba(0,60,120,0.06);border:1px solid rgba(0,60,120,0.12);border-radius:8px;padding:7px 15px;color:var(--wave);cursor:pointer;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;}
+  .cal-month-label{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--wave);font-weight:700;}
+  .cal-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
+  .cal-legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dtext);font-weight:600;}
+  .cal-legend-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
   /* ── TOAST ── */
   .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%) translateY(-100px);background:rgba(39,174,96,.95);color:#fff;padding:.75rem 1.5rem;border-radius:25px;font-weight:600;font-size:14px;z-index:9999;transition:transform .3s;box-shadow:0 4px 20px rgba(0,0,0,.3);}
   .toast.show{transform:translateX(-50%) translateY(0);}
@@ -146,6 +163,7 @@
   <div class="wrap">
     <div class="tabs" id="tabBar">
       <button class="tab-btn active" onclick="switchTab('barcos')"><i class="fa-solid fa-ship"></i>Barcos</button>
+      <button class="tab-btn hidden" id="tabBtnCalendario" onclick="switchTab('calendario')"><i class="fa-solid fa-calendar-days"></i>Calendario</button>
       <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')"><i class="fa-solid fa-users"></i>Equipo</button>
       <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')"><i class="fa-solid fa-star"></i>Vendedores</button>
       <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')"><i class="fa-solid fa-chart-bar"></i>Reportes</button>
@@ -158,6 +176,19 @@
       </div>
       <div id="boatsGrid" class="cards-grid"></div>
       <div id="boatsEmpty" class="empty-state hidden">Todavía no hay barcos. Agrega el primero.</div>
+    </div>
+
+    <div id="panelCalendario" class="tab-panel">
+      <div class="section-title">
+        <h2>Calendario</h2>
+      </div>
+      <div class="cal-legend" id="calLegend"></div>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="changeCalMonth(-1)">◀</button>
+        <div class="cal-month-label" id="calMonthLabel"></div>
+        <button class="cal-nav-btn" onclick="changeCalMonth(1)">▶</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
     </div>
 
     <div id="panelEquipo" class="tab-panel">
@@ -199,7 +230,14 @@
   <div class="wrap">
     <div id="vendorSummary" class="stats-row"></div>
 
-    <div class="section-title">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="changeVendorCalMonth(-1)">◀</button>
+      <div class="cal-month-label" id="vendorCalMonthLabel"></div>
+      <button class="cal-nav-btn" onclick="changeVendorCalMonth(1)">▶</button>
+    </div>
+    <div class="cal-grid" id="vendorCalGrid"></div>
+
+    <div class="section-title" style="margin-top:22px;">
       <h2>Mis reservas</h2>
       <button class="add-btn" onclick="openAddReservation()">+ Nueva reserva</button>
     </div>
@@ -499,7 +537,9 @@ async function enterDashboard(){
   document.getElementById('companyNameLabel').textContent = session.company_name || 'Charter Sealife';
   document.getElementById('whoLabel').textContent = `${session.name} · ${roleLabel(session.role)}`;
   const isAdmin = session.role === 'administrador';
+  const isReservas = session.role === 'reservas';
   document.getElementById('addBoatBtn').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnCalendario').classList.toggle('hidden', !(isAdmin || isReservas));
   document.getElementById('tabBtnEquipo').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnVendedores').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnReportes').classList.toggle('hidden', !isAdmin);
@@ -514,7 +554,7 @@ async function enterDashboard(){
   }
   const manageBtn = document.getElementById('manageSubBtn');
   manageBtn.classList.toggle('hidden', !(isAdmin && session.subscription_status === 'active'));
-  switchTab('barcos');
+  switchTab(isReservas ? 'calendario' : 'barcos');
 }
 
 function roleLabel(r){
@@ -524,16 +564,90 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { barcos: 0, equipo: 1, vendedores: 2, reportes: 3 };
+  const btnMap = { barcos: 0, calendario: 1, equipo: 2, vendedores: 3, reportes: 4 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
     loadedTabs.add(name);
     if (name === 'barcos') loadBoats();
+    if (name === 'calendario') loadCalendar();
     if (name === 'equipo') loadUsers();
     if (name === 'vendedores') loadVendors();
     if (name === 'reportes') loadReports();
   }
+}
+
+const MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const DOW_NAMES = ['Do','Lu','Ma','Mi','Ju','Vi','Sa'];
+const today = new Date();
+let calState = { month: today.getMonth(), year: today.getFullYear(), reservations: [], boats: [] };
+
+async function loadCalendar(){
+  try{
+    const [reservations, boats] = await Promise.all([
+      callRpc('list_reservations', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+    calState.reservations = reservations;
+    calState.boats = boats;
+    boats.forEach(b => boatsById[b.id] = b.name);
+    renderCalendar();
+  }catch(e){ showToast('No se pudo cargar el calendario: ' + e.message, 'error'); }
+}
+
+function changeCalMonth(dir){
+  calState.month += dir;
+  if (calState.month > 11) { calState.month = 0; calState.year++; }
+  if (calState.month < 0) { calState.month = 11; calState.year--; }
+  renderCalendar();
+}
+
+function buildCalGrid(month, year, reservations, boats, onDayClick){
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const todayStr = new Date().toISOString().slice(0,10);
+  let html = DOW_NAMES.map(d => `<div class="cal-dow">${d}</div>`).join('');
+  for (let i=0;i<firstDay;i++) html += `<div class="cal-day empty"></div>`;
+  for (let d=1; d<=daysInMonth; d++){
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayRes = reservations.filter(r => r.reservation_date === dateStr);
+    const isToday = dateStr === todayStr;
+    const chips = dayRes.slice(0,3).map(r => {
+      const boat = boats.find(b => b.id === r.boat_id);
+      const bg = boat ? (boat.color || '#1a5276') : '#1a5276';
+      const label = boat ? boat.name.slice(0,6) : 'Barco';
+      return `<div class="cal-chip" style="background:${bg};color:#fff;">${escapeHtml(label)}</div>`;
+    }).join('');
+    const extra = dayRes.length > 3 ? `<div class="cal-more">+${dayRes.length-3}</div>` : '';
+    html += `<div class="cal-day${isToday?' today':''}" onclick="${onDayClick}('${dateStr}')">
+      <div class="cal-daynum">${d}</div>${chips}${extra}
+    </div>`;
+  }
+  return html;
+}
+
+function renderCalendar(){
+  const { month, year, reservations, boats } = calState;
+  document.getElementById('calMonthLabel').textContent = `${MONTH_NAMES[month]} ${year}`;
+  document.getElementById('calLegend').innerHTML = boats.map(b =>
+    `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${b.color||'#1a5276'};"></span>${escapeHtml(b.name)}</div>`
+  ).join('');
+  document.getElementById('calGrid').innerHTML = buildCalGrid(month, year, reservations, boats, 'showCalDay');
+}
+
+function showCalDay(dateStr){
+  const dayRes = calState.reservations.filter(r => r.reservation_date === dateStr);
+  document.getElementById('vendorDetailTitle').textContent = dateStr;
+  const box = document.getElementById('vendorDetailList');
+  box.innerHTML = dayRes.map(r => {
+    const boat = calState.boats.find(b => b.id === r.boat_id);
+    return `<div class="item-card" style="margin-bottom:10px;${boat ? 'border-left-color:'+boat.color+';' : ''}">
+      <h3>${escapeHtml(boat ? boat.name : 'Barco')}</h3>
+      <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
+      <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
+    </div>`;
+  }).join('') || '<div class="empty-state">Sin reservas este día.</div>';
+  openModal('vendorDetailModal');
 }
 
 function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
@@ -683,7 +797,10 @@ async function submitRegisterPayment(){
     await callRpc('register_payment', { p_token: session.token, p_reservation_id: reservationId, p_amount: amount });
     closeModal('registerPaymentModal');
     closeModal('vendorDetailModal');
-    await loadReports();
+    if (!document.getElementById('dashboardScreen').classList.contains('hidden')) {
+      if (loadedTabs.has('reportes')) await loadReports();
+      if (loadedTabs.has('calendario')) await loadCalendar();
+    }
     showToast('Pago registrado');
   }catch(e){ showToast('Error al registrar pago: ' + e.message, 'error'); }
 }
@@ -773,10 +890,39 @@ async function enterVendorView(){
   await loadMyReservations();
 }
 
-function openAddReservation(){
-  const today = new Date().toISOString().slice(0,10);
-  document.getElementById('newResDate').value = today;
+function openAddReservation(dateStr){
+  document.getElementById('newResDate').value = dateStr || new Date().toISOString().slice(0,10);
   openModal('addReservationModal');
+}
+
+let vendorCalState = { month: today.getMonth(), year: today.getFullYear(), reservations: [] };
+
+function renderVendorCalendarGrid(){
+  const { month, year, reservations } = vendorCalState;
+  document.getElementById('vendorCalMonthLabel').textContent = `${MONTH_NAMES[month]} ${year}`;
+  document.getElementById('vendorCalGrid').innerHTML = buildCalGrid(month, year, reservations, [], 'showVendorCalDay');
+}
+
+function changeVendorCalMonth(dir){
+  vendorCalState.month += dir;
+  if (vendorCalState.month > 11) { vendorCalState.month = 0; vendorCalState.year++; }
+  if (vendorCalState.month < 0) { vendorCalState.month = 11; vendorCalState.year--; }
+  renderVendorCalendarGrid();
+}
+
+function showVendorCalDay(dateStr){
+  const dayRes = vendorCalState.reservations.filter(r => r.reservation_date === dateStr);
+  if (!dayRes.length) { openAddReservation(dateStr); return; }
+  document.getElementById('vendorDetailTitle').textContent = dateStr;
+  const box = document.getElementById('vendorDetailList');
+  box.innerHTML = dayRes.map(r => {
+    return `<div class="item-card" style="margin-bottom:10px;">
+      <h3>${escapeHtml(boatsById[r.boat_id] || 'Barco')}</h3>
+      <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
+      <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
+    </div>`;
+  }).join('');
+  openModal('vendorDetailModal');
 }
 
 async function loadMyReservations(){
@@ -801,6 +947,9 @@ async function loadMyReservations(){
         <div class="stat-card"><div class="label">Reservas realizadas</div><div class="value">${reservations.length}</div></div>
       `;
     }
+
+    vendorCalState.reservations = reservations;
+    renderVendorCalendarGrid();
 
     if (!reservations.length){ empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
