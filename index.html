@@ -105,21 +105,26 @@
   .status-pill.resuelto{background:rgba(39,174,96,.18);color:#1e8449;}
 
   /* ── CALENDAR ── */
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px;}
-  .cal-dow{font-size:12px;color:var(--dmuted);text-align:center;font-weight:700;padding:6px 0;}
-  .cal-day{background:var(--card);border-radius:10px;min-height:95px;padding:6px 4px;cursor:pointer;border:1px solid rgba(0,60,120,0.08);display:flex;flex-direction:column;align-items:center;gap:3px;box-sizing:border-box;overflow:hidden;}
+  .cal-card{background:rgba(210,228,248,0.8);border:1px solid rgba(0,60,120,0.15);border-radius:14px;padding:10px 8px;margin-top:10px;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0 2px;}
+  .cal-dow{font-size:12px;color:var(--dtext);text-align:center;font-weight:700;padding:4px 0;}
+  .cal-day{background:#ffffff;border-radius:6px;min-height:95px;padding:4px 3px;cursor:pointer;border:1px solid rgba(0,60,120,0.1);display:flex;flex-direction:column;align-items:center;gap:2px;box-sizing:border-box;overflow:hidden;}
   .cal-day.today{border:2px solid var(--gold);}
   .cal-day.empty{background:transparent;border:none;cursor:default;}
-  .cal-daynum{font-size:13px;color:var(--dmuted);font-weight:700;align-self:flex-start;}
-  .cal-day.today .cal-daynum{color:var(--gold);}
-  .cal-chip{font-size:10px;font-weight:700;border-radius:4px;padding:2px 4px;text-align:center;width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
-  .cal-more{font-size:10px;color:var(--dmuted);font-weight:600;}
-  .cal-nav{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;}
+  .cal-daynum{font-size:13px;color:var(--dtext);font-weight:600;align-self:center;margin-bottom:2px;}
+  .cal-day.today .cal-daynum{color:var(--gold);font-weight:700;}
+  .cal-chip{font-size:10px;font-weight:700;border-radius:4px;padding:2px 3px;text-align:center;width:100%;line-height:1.25;overflow:hidden;box-sizing:border-box;}
+  .cal-chip.direct{border:2px solid #000;}
+  .cal-more{font-size:9px;color:var(--dmuted);font-weight:600;}
+  .cal-nav{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;padding:0 2px;}
   .cal-nav-btn{background:rgba(0,60,120,0.06);border:1px solid rgba(0,60,120,0.12);border-radius:8px;padding:7px 15px;color:var(--wave);cursor:pointer;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;}
-  .cal-month-label{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--wave);font-weight:700;}
-  .cal-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px;}
-  .cal-legend-item{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--dtext);font-weight:600;}
+  .cal-month-label{font-family:'Cormorant Garamond',serif;font-size:20px;color:#0d1f3c;font-weight:700;}
+  .cal-legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px;align-items:center;}
+  .cal-legend-item{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--dtext);font-weight:700;}
   .cal-legend-dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+  .cal-legend-count{background:var(--dot,#1a5276);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;}
+  .cal-legend-total{font-size:12px;color:var(--dtext);font-weight:700;}
+  .cal-legend-total span{background:rgba(0,0,0,0.1);border-radius:10px;padding:1px 7px;}
 
   /* ── TOAST ── */
   .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%) translateY(-100px);background:rgba(39,174,96,.95);color:#fff;padding:.75rem 1.5rem;border-radius:25px;font-weight:600;font-size:14px;z-index:9999;transition:transform .3s;box-shadow:0 4px 20px rgba(0,0,0,.3);}
@@ -257,12 +262,14 @@
         <button class="add-btn hidden" id="addResBtn" onclick="openAddReservationFromCalendar()">+ Agregar reserva</button>
       </div>
       <div class="cal-legend" id="calLegend"></div>
-      <div class="cal-nav">
-        <button class="cal-nav-btn" onclick="changeCalMonth(-1)">◀</button>
-        <div class="cal-month-label" id="calMonthLabel"></div>
-        <button class="cal-nav-btn" onclick="changeCalMonth(1)">▶</button>
+      <div class="cal-card">
+        <div class="cal-nav">
+          <button class="cal-nav-btn" onclick="changeCalMonth(-1)">◀</button>
+          <div class="cal-month-label" id="calMonthLabel"></div>
+          <button class="cal-nav-btn" onclick="changeCalMonth(1)">▶</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
       </div>
-      <div class="cal-grid" id="calGrid"></div>
     </div>
 
     <div id="panelEquipo" class="tab-panel">
@@ -994,8 +1001,10 @@ function buildCalGrid(month, year, reservations, boats, onDayClick){
     const chips = dayRes.slice(0,3).map(r => {
       const boat = boats.find(b => b.id === r.boat_id);
       const bg = boat ? (boat.color || '#1a5276') : '#1a5276';
-      const label = boat ? boat.name.slice(0,6) : 'Barco';
-      return `<div class="cal-chip" style="background:${bg};color:#fff;">${escapeHtml(label)}</div>`;
+      const label = boat ? boat.name.slice(0,4) : 'Bco';
+      const time = r.departure_time ? r.departure_time.slice(0,5) : (r.hours ? r.hours + 'h' : '');
+      const isDirect = !r.vendor_id;
+      return `<div class="cal-chip${isDirect ? ' direct' : ''}" style="background:${bg};color:#fff;">${escapeHtml(label)}${time ? ' ' + time : ''}</div>`;
     }).join('');
     const extra = dayRes.length > 3 ? `<div class="cal-more">+${dayRes.length-3}</div>` : '';
     html += `<div class="cal-day${isToday?' today':''}" onclick="${onDayClick}('${dateStr}')">
@@ -1008,9 +1017,12 @@ function buildCalGrid(month, year, reservations, boats, onDayClick){
 function renderCalendar(){
   const { month, year, reservations, boats } = calState;
   document.getElementById('calMonthLabel').textContent = `${MONTH_NAMES[month]} ${year}`;
-  document.getElementById('calLegend').innerHTML = boats.map(b =>
-    `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${b.color||'#1a5276'};"></span>${escapeHtml(b.name)}</div>`
-  ).join('');
+  const monthPrefix = `${year}-${String(month+1).padStart(2,'0')}`;
+  const monthReservations = reservations.filter(r => r.reservation_date && r.reservation_date.startsWith(monthPrefix));
+  document.getElementById('calLegend').innerHTML = boats.map(b => {
+    const cnt = monthReservations.filter(r => r.boat_id === b.id).length;
+    return `<div class="cal-legend-item"><span class="cal-legend-dot" style="background:${b.color||'#1a5276'};"></span>${escapeHtml(b.name)}${cnt > 0 ? `<span class="cal-legend-count" style="background:${b.color||'#1a5276'};">${cnt}</span>` : ''}</div>`;
+  }).join('') + `<div class="cal-legend-total">Total: <span>${monthReservations.length}</span></div>`;
   document.getElementById('calGrid').innerHTML = buildCalGrid(month, year, reservations, boats, 'showCalDay');
 }
 
