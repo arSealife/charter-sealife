@@ -103,15 +103,15 @@
   .status-pill.resuelto{background:rgba(39,174,96,.18);color:#1e8449;}
 
   /* ── CALENDAR ── */
-  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px;}
-  .cal-dow{font-size:11px;color:var(--dmuted);text-align:center;font-weight:700;padding:4px 0;}
-  .cal-day{background:var(--card);border-radius:8px;min-height:60px;padding:4px 3px;cursor:pointer;border:1px solid rgba(0,60,120,0.08);display:flex;flex-direction:column;align-items:center;gap:2px;box-sizing:border-box;overflow:hidden;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:8px;}
+  .cal-dow{font-size:12px;color:var(--dmuted);text-align:center;font-weight:700;padding:6px 0;}
+  .cal-day{background:var(--card);border-radius:10px;min-height:95px;padding:6px 4px;cursor:pointer;border:1px solid rgba(0,60,120,0.08);display:flex;flex-direction:column;align-items:center;gap:3px;box-sizing:border-box;overflow:hidden;}
   .cal-day.today{border:2px solid var(--gold);}
   .cal-day.empty{background:transparent;border:none;cursor:default;}
-  .cal-daynum{font-size:11px;color:var(--dmuted);font-weight:600;align-self:flex-start;}
+  .cal-daynum{font-size:13px;color:var(--dmuted);font-weight:700;align-self:flex-start;}
   .cal-day.today .cal-daynum{color:var(--gold);}
-  .cal-chip{font-size:9px;font-weight:700;border-radius:3px;padding:1px 3px;text-align:center;width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
-  .cal-more{font-size:9px;color:var(--dmuted);}
+  .cal-chip{font-size:10px;font-weight:700;border-radius:4px;padding:2px 4px;text-align:center;width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;}
+  .cal-more{font-size:10px;color:var(--dmuted);font-weight:600;}
   .cal-nav{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;}
   .cal-nav-btn{background:rgba(0,60,120,0.06);border:1px solid rgba(0,60,120,0.12);border-radius:8px;padding:7px 15px;color:var(--wave);cursor:pointer;font-size:14px;font-weight:700;font-family:'Rajdhani',sans-serif;}
   .cal-month-label{font-family:'Cormorant Garamond',serif;font-size:20px;color:var(--wave);font-weight:700;}
@@ -229,7 +229,7 @@
   </header>
   <div class="wrap">
     <div class="tabs" id="tabBar">
-      <button class="tab-btn active" onclick="switchTab('barcos')"><i class="fa-solid fa-ship"></i>Barcos</button>
+      <button class="tab-btn active" id="tabBtnBarcos" onclick="switchTab('barcos')"><i class="fa-solid fa-ship"></i>Barcos</button>
       <button class="tab-btn hidden" id="tabBtnCalendario" onclick="switchTab('calendario')"><i class="fa-solid fa-calendar-days"></i>Calendario</button>
       <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')"><i class="fa-solid fa-users"></i>Equipo</button>
       <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')"><i class="fa-solid fa-star"></i>Vendedores</button>
@@ -487,6 +487,25 @@
     <div class="modal-actions">
       <button class="btn secondary" style="flex:1" onclick="closeModal('addReservationModal')">Cancelar</button>
       <button class="btn" style="flex:1" onclick="submitAddReservation()">Reservar</button>
+    </div>
+  </div>
+</div>
+
+<div id="editReservationModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Editar reserva</h3>
+    <input id="editResId" type="hidden">
+    <label>Barco</label>
+    <select id="editResBoat"></select>
+    <label>Fecha</label>
+    <input id="editResDate" type="date">
+    <label>Horas</label>
+    <input id="editResHours" type="number" min="1" step="0.5" placeholder="ej. 4">
+    <label>Monto (MXN)</label>
+    <input id="editResAmount" type="number" min="0" step="1" placeholder="ej. 3000">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('editReservationModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitEditReservation()">Guardar</button>
     </div>
   </div>
 </div>
@@ -888,6 +907,7 @@ async function enterDashboard(){
   const isAdmin = session.role === 'administrador';
   const isReservas = session.role === 'reservas';
   document.getElementById('addBoatBtn').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnBarcos').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnCalendario').classList.toggle('hidden', !(isAdmin || isReservas));
   document.getElementById('tabBtnEquipo').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnVendedores').classList.toggle('hidden', !isAdmin);
@@ -1002,10 +1022,80 @@ function showCalDay(dateStr){
       <h3>${escapeHtml(boat ? boat.name : 'Barco')}</h3>
       <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
       <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
+      ${canAdd ? `<div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn secondary" style="flex:1;" onclick="openEditReservation('${r.id}')">Editar</button>
+        <button class="btn secondary" style="flex:1;color:var(--danger);" onclick="confirmDeleteReservation('${r.id}')">Eliminar</button>
+      </div>` : ''}
     </div>`;
   }).join('') || (canAdd ? '' : '<div class="empty-state">Sin reservas este día.</div>');
   box.innerHTML = addBtn + list;
   openModal('vendorDetailModal');
+}
+
+function findReservationById(id){
+  const pools = [calState.reservations, reservationsCache,
+    (typeof vendorCalState !== 'undefined' ? vendorCalState.reservations : null),
+    (typeof capCalState !== 'undefined' ? capCalState.reservations : null)];
+  for (const pool of pools){
+    if (!pool) continue;
+    const r = pool.find(x => x.id === id);
+    if (r) return r;
+  }
+  return null;
+}
+
+async function openEditReservation(resId){
+  const r = findReservationById(resId);
+  if (!r) return showToast('No se encontró la reserva.', 'error');
+  closeModal('vendorDetailModal');
+  if (!calState.boats.length) {
+    try { calState.boats = await callRpc('list_boats', { p_token: session.token }); } catch(e){}
+  }
+  const sel = document.getElementById('editResBoat');
+  sel.innerHTML = calState.boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  document.getElementById('editResId').value = r.id;
+  sel.value = r.boat_id;
+  document.getElementById('editResDate').value = r.reservation_date;
+  document.getElementById('editResHours').value = r.hours || '';
+  document.getElementById('editResAmount').value = r.amount || '';
+  openModal('editReservationModal');
+}
+
+async function submitEditReservation(){
+  const id = document.getElementById('editResId').value;
+  const boat_id = document.getElementById('editResBoat').value;
+  const date = document.getElementById('editResDate').value;
+  const hours = document.getElementById('editResHours').value;
+  const amount = document.getElementById('editResAmount').value;
+  if (!boat_id || !date) return alert('Elige barco y fecha.');
+  try{
+    await callRpc('update_reservation', {
+      p_token: session.token, p_reservation_id: id, p_boat_id: boat_id, p_reservation_date: date,
+      p_hours: hours ? Number(hours) : null, p_amount: amount ? Number(amount) : 0
+    });
+    closeModal('editReservationModal');
+    await refreshReservationViews();
+    showToast('Reserva actualizada');
+  }catch(e){ showToast('Error al guardar: ' + e.message, 'error'); }
+}
+
+async function confirmDeleteReservation(resId){
+  if (!confirm('¿Eliminar esta reserva? Esta acción no se puede deshacer.')) return;
+  try{
+    await callRpc('delete_reservation', { p_token: session.token, p_reservation_id: resId });
+    closeModal('vendorDetailModal');
+    await refreshReservationViews();
+    showToast('Reserva eliminada');
+  }catch(e){ showToast('Error al eliminar: ' + e.message, 'error'); }
+}
+
+async function refreshReservationViews(){
+  if (!document.getElementById('dashboardScreen').classList.contains('hidden')) {
+    if (loadedTabs.has('calendario')) await loadCalendar();
+    if (loadedTabs.has('reportes')) await loadReports();
+  } else if (!document.getElementById('vendorScreen').classList.contains('hidden')) {
+    await loadMyReservations();
+  }
 }
 
 async function openAddReservationFromCalendar(dateStr){
@@ -1154,9 +1244,9 @@ async function loadReports(){
 
     const byVendor = {};
     reservations.forEach(r => {
-      if (!r.vendor_id) return;
-      if (!byVendor[r.vendor_id]) byVendor[r.vendor_id] = [];
-      byVendor[r.vendor_id].push(r);
+      const key = r.vendor_id || '__none__';
+      if (!byVendor[key]) byVendor[key] = [];
+      byVendor[key].push(r);
     });
 
     const vendorIds = Object.keys(byVendor);
@@ -1169,11 +1259,12 @@ async function loadReports(){
       const totalPagado = list.reduce((s,r) => s + Number(r.paid_amount||0), 0);
       return { vid, list, totalReservado, totalPagado, pendiente: totalReservado - totalPagado };
     }).sort((a,b) => b.pendiente - a.pendiente).forEach(({vid, list, totalReservado, totalPagado, pendiente}) => {
-      const v = vendorsCache[vid];
-      const typeLabel = v && v.vendor_type === 'empresa_credito' ? 'Empresa con crédito' : 'Vendedor directo';
+      const isDirect = vid === '__none__';
+      const v = isDirect ? null : vendorsCache[vid];
+      const typeLabel = isDirect ? 'Reservas directas / sin vendedor' : (v && v.vendor_type === 'empresa_credito' ? 'Empresa con crédito' : 'Vendedor directo');
       const card = document.createElement('div');
       card.className = 'item-card';
-      card.innerHTML = `<h3>${escapeHtml(v ? v.name : 'Vendedor')}</h3>
+      card.innerHTML = `<h3>${escapeHtml(isDirect ? 'Reservas directas' : (v ? v.name : 'Vendedor'))}</h3>
         <span class="badge">${typeLabel}</span>
         <div class="meta" style="margin-top:8px;">${list.length} reserva(s)</div>
         <div class="meta">Reservado: ${fmtMoney(totalReservado)}</div>
@@ -1189,10 +1280,12 @@ async function loadReports(){
 }
 
 function openVendorDetail(vid){
-  const v = vendorsCache[vid];
-  const list = reservationsCache.filter(r => r.vendor_id === vid);
-  document.getElementById('vendorDetailTitle').textContent = v ? v.name : 'Vendedor';
+  const isDirect = vid === '__none__';
+  const v = isDirect ? null : vendorsCache[vid];
+  const list = reservationsCache.filter(r => isDirect ? !r.vendor_id : r.vendor_id === vid);
+  document.getElementById('vendorDetailTitle').textContent = isDirect ? 'Reservas directas / sin vendedor' : (v ? v.name : 'Vendedor');
   const box = document.getElementById('vendorDetailList');
+  const canManage = session && session.role === 'administrador';
   box.innerHTML = list.map(r => {
     const pend = Number(r.amount||0) - Number(r.paid_amount||0);
     return `<div class="item-card" style="margin-bottom:10px;">
@@ -1200,6 +1293,10 @@ function openVendorDetail(vid){
       <div class="meta">${r.reservation_date} · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
       <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
       ${pend > 0 ? `<div><button class="btn" style="margin-top:10px;" onclick="openRegisterPayment('${r.id}', ${pend})">Registrar pago</button></div>` : ''}
+      ${canManage ? `<div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn secondary" style="flex:1;" onclick="openEditReservation('${r.id}')">Editar</button>
+        <button class="btn secondary" style="flex:1;color:var(--danger);" onclick="confirmDeleteReservation('${r.id}')">Eliminar</button>
+      </div>` : ''}
     </div>`;
   }).join('') || '<div class="empty-state">Sin reservas.</div>';
   openModal('vendorDetailModal');
