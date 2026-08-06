@@ -250,6 +250,7 @@
     <div id="panelCalendario" class="tab-panel">
       <div class="section-title">
         <h2>Calendario</h2>
+        <button class="add-btn hidden" id="addResBtn" onclick="openAddReservationFromCalendar()">+ Agregar reserva</button>
       </div>
       <div class="cal-legend" id="calLegend"></div>
       <div class="cal-nav">
@@ -905,6 +906,7 @@ async function enterDashboard(){
   }
   const manageBtn = document.getElementById('manageSubBtn');
   manageBtn.classList.toggle('hidden', !(isAdmin && session.subscription_status === 'active'));
+  document.getElementById('addResBtn').classList.toggle('hidden', !(isAdmin || isReservas));
   switchTab(isReservas ? 'calendario' : 'barcos');
 }
 
@@ -992,15 +994,31 @@ function showCalDay(dateStr){
   const dayRes = calState.reservations.filter(r => r.reservation_date === dateStr);
   document.getElementById('vendorDetailTitle').textContent = dateStr;
   const box = document.getElementById('vendorDetailList');
-  box.innerHTML = dayRes.map(r => {
+  const canAdd = session && (session.role === 'administrador' || session.role === 'reservas');
+  const addBtn = canAdd ? `<button class="btn" style="width:100%;margin-bottom:12px;" onclick="openAddReservationFromCalendar('${dateStr}')">+ Agregar reserva</button>` : '';
+  const list = dayRes.map(r => {
     const boat = calState.boats.find(b => b.id === r.boat_id);
     return `<div class="item-card" style="margin-bottom:10px;${boat ? 'border-left-color:'+boat.color+';' : ''}">
       <h3>${escapeHtml(boat ? boat.name : 'Barco')}</h3>
       <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
       <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
     </div>`;
-  }).join('') || '<div class="empty-state">Sin reservas este día.</div>';
+  }).join('') || (canAdd ? '' : '<div class="empty-state">Sin reservas este día.</div>');
+  box.innerHTML = addBtn + list;
   openModal('vendorDetailModal');
+}
+
+async function openAddReservationFromCalendar(dateStr){
+  closeModal('vendorDetailModal');
+  if (!calState.boats.length) {
+    try { calState.boats = await callRpc('list_boats', { p_token: session.token }); } catch(e){}
+  }
+  const sel = document.getElementById('newResBoat');
+  sel.innerHTML = calState.boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  document.getElementById('newResDate').value = dateStr || new Date().toISOString().slice(0,10);
+  document.getElementById('newResHours').value = '';
+  document.getElementById('newResAmount').value = '';
+  openModal('addReservationModal');
 }
 
 function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
@@ -1537,7 +1555,11 @@ async function submitAddReservation(){
     closeModal('addReservationModal');
     document.getElementById('newResHours').value = '';
     document.getElementById('newResAmount').value = '';
-    await loadMyReservations();
+    if (!document.getElementById('vendorScreen').classList.contains('hidden')) {
+      await loadMyReservations();
+    } else if (!document.getElementById('dashboardScreen').classList.contains('hidden')) {
+      await loadCalendar();
+    }
     showToast('Reserva creada 🚤');
     fetch(EDGE('notify-reservation'), {
       method: 'POST',
