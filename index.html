@@ -561,6 +561,19 @@
   </div>
 </div>
 
+<div id="resetPinModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Restablecer PIN</h3>
+    <div id="resetPinUserLabel" class="meta" style="margin-bottom:8px;"></div>
+    <label>Nuevo PIN</label>
+    <input id="resetPinValue" type="password" inputmode="numeric" placeholder="4 dígitos">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('resetPinModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitResetPin()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="addVendorModal" class="modal-bg hidden">
   <div class="modal">
     <h3>Nuevo vendedor</h3>
@@ -1363,7 +1376,10 @@ async function loadUsers(){
       const isSelf = u.id === session.user_id;
       card.innerHTML = `<h3>${escapeHtml(u.name)}</h3><span class="badge">${roleLabel(u.role)}</span>
         ${!u.active ? '<span class="badge">Inactivo</span>' : ''}
-        ${!isSelf ? `<button class="btn secondary" style="margin-top:10px;" onclick="toggleUserActive('${u.id}', ${!u.active})">${u.active ? 'Desactivar' : 'Activar'}</button>` : ''}`;
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn secondary" style="width:auto;margin-top:0;" onclick="openResetPinModal('${u.id}', '${escapeHtml(u.name).replace(/'/g,"\\'")}')">Restablecer PIN</button>
+          ${!isSelf ? `<button class="btn secondary" style="width:auto;margin-top:0;" onclick="toggleUserActive('${u.id}', ${!u.active})">${u.active ? 'Desactivar' : 'Activar'}</button>` : ''}
+        </div>`;
       grid.appendChild(card);
     });
   }catch(e){
@@ -2390,6 +2406,29 @@ async function downloadGastosCuadre(){
     doc.save('Cuadre_'+MONTH_NAMES[month]+'_'+year+'.pdf');
     showToast('PDF generado');
   }catch(e){ showToast('Error al generar PDF: ' + e.message, 'error'); }
+}
+
+function openResetPinModal(userId, userName){
+  document.getElementById('resetPinUserLabel').textContent = userName;
+  document.getElementById('resetPinValue').value = '';
+  document.getElementById('resetPinModal').dataset.userId = userId;
+  openModal('resetPinModal');
+}
+
+async function submitResetPin(){
+  const modal = document.getElementById('resetPinModal');
+  const userId = modal.dataset.userId;
+  const pin = document.getElementById('resetPinValue').value.trim();
+  if (!pin || pin.length < 4) return alert('Ingresa un PIN de al menos 4 dígitos.');
+  try{
+    await callRpc('reset_user_pin', { p_token: session.token, p_user_id: userId, p_new_pin: pin });
+    closeModal('resetPinModal');
+    await loadUsers();
+    showToast('PIN actualizado');
+  }catch(e){
+    const map = { pin_taken: 'Ese PIN ya está en uso en tu empresa, elige otro.', invalid_pin: 'El PIN debe tener al menos 4 dígitos.', not_found: 'No se encontró a la persona.' };
+    showToast('Error al actualizar PIN: ' + (map[e.message] || e.message), 'error');
+  }
 }
 
 function escapeHtml(s){
