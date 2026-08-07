@@ -255,6 +255,7 @@
       <button class="tab-btn hidden" id="tabBtnEmpresas" onclick="switchTab('empresas')"><i class="fa-solid fa-building"></i>Empresas</button>
       <button class="tab-btn hidden" id="tabBtnReporteEmpresas" onclick="switchTab('reporteEmpresas')"><i class="fa-solid fa-chart-line"></i>Reporte empresas</button>
       <button class="tab-btn hidden" id="tabBtnReportesDirectos" onclick="switchTab('reportesDirectos')"><i class="fa-solid fa-file-invoice-dollar"></i>Reportes directos</button>
+      <button class="tab-btn hidden" id="tabBtnCombustible" onclick="switchTab('combustible')"><i class="fa-solid fa-gas-pump"></i>Combustible</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel">
@@ -382,6 +383,19 @@
       <div id="directosStats" class="stats-row"></div>
       <div id="directosMonths"></div>
       <div id="directosEmpty" class="empty-state hidden">Sin reservas directas.</div>
+    </div>
+
+    <div id="panelCombustible" class="tab-panel">
+      <div class="section-title">
+        <h2>Combustible</h2>
+      </div>
+      <div id="combustibleMonthTitle" style="font-size:13px;color:var(--dmuted);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;"></div>
+      <div id="combustibleMonthly" class="stats-row"></div>
+      <div class="section-title" style="margin-top:22px;"><h2>Saldo por barco</h2></div>
+      <div id="combustibleSaldos"></div>
+      <div class="section-title" style="margin-top:22px;"><h2>Bitácora de combustible</h2></div>
+      <div id="combustibleBitacora" class="cards-grid"></div>
+      <div id="combustibleEmpty" class="empty-state hidden">Sin registros de combustible.</div>
     </div>
 
     <div id="panelOperacion" class="tab-panel active">
@@ -740,6 +754,19 @@
   </div>
 </div>
 
+<div id="adjustFuelModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Ajustar saldo de combustible</h3>
+    <div id="adjustFuelBoatLabel" class="meta" style="margin-bottom:8px;"></div>
+    <label>Saldo real en el tanque (checar medidor)</label>
+    <input id="adjustFuelRealBalance" type="number" placeholder="Ej. 16000">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('adjustFuelModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAdjustFuel()">Guardar ajuste</button>
+    </div>
+  </div>
+</div>
+
 <div id="addExpenseModal" class="modal-bg hidden">
   <div class="modal">
     <h3>Registrar gasto</h3>
@@ -1041,6 +1068,7 @@ async function enterDashboard(){
   document.getElementById('tabBtnEmpresas').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnReporteEmpresas').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnReportesDirectos').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnCombustible').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnOperacion').classList.toggle('hidden', !isAdmin);
   document.getElementById('telegramBtn').classList.toggle('hidden', !isAdmin);
   const subBtn = document.getElementById('subscribeHeaderBtn');
@@ -1065,7 +1093,7 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8, piezas: 9, empresas: 10, reporteEmpresas: 11, reportesDirectos: 12 };
+  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8, piezas: 9, empresas: 10, reporteEmpresas: 11, reportesDirectos: 12, combustible: 13 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
@@ -1083,6 +1111,7 @@ function switchTab(name){
     if (name === 'empresas') loadEmpresas();
     if (name === 'reporteEmpresas') loadReporteEmpresas();
     if (name === 'reportesDirectos') loadReportesDirectos();
+    if (name === 'combustible') loadCombustible();
   }
 }
 
@@ -1556,8 +1585,9 @@ async function loadOperacion(){
     boats.forEach(b => {
       if (!b.fuel_cost_per_trip) return;
       const bTrips = trips.filter(t => t.boat_id === b.id);
+      const bRealTrips = bTrips.filter(t => !isCalibrationTrip(t));
       const totalLoaded = bTrips.reduce((s,t) => s + (Number(t.fuel_amount)||0), 0);
-      const spent = bTrips.length * Number(b.fuel_cost_per_trip);
+      const spent = bRealTrips.length * Number(b.fuel_cost_per_trip);
       const balance = totalLoaded - spent;
       if (balance <= Number(b.fuel_alert_at || 0)) {
         const tripsLeft = Math.floor(balance / Number(b.fuel_cost_per_trip));
@@ -1575,12 +1605,13 @@ async function loadOperacion(){
       boatsEmpty.classList.add('hidden');
       boats.forEach(b => {
         const bTrips = trips.filter(t => t.boat_id === b.id);
+        const bRealTrips = bTrips.filter(t => !isCalibrationTrip(t));
         const bFaults = activeFaults.filter(f => f.boat_id === b.id);
         const lastTrip = bTrips.slice().sort((x,y) => new Date(y.departure_time) - new Date(x.departure_time))[0];
         const engineHours = bTrips.reduce((s,t) => (t.engine_hours_start != null && t.engine_hours_end != null) ? s + (t.engine_hours_end - t.engine_hours_start) : s, 0);
         const totalLoaded = bTrips.reduce((s,t) => s + (Number(t.fuel_amount)||0), 0);
         const cost = Number(b.fuel_cost_per_trip || 0);
-        const balance = totalLoaded - (bTrips.length * cost);
+        const balance = totalLoaded - (bRealTrips.length * cost);
         const tripsLeft = cost > 0 ? Math.floor(balance / cost) : null;
         const card = document.createElement('div');
         card.className = 'item-card';
@@ -1594,7 +1625,7 @@ async function loadOperacion(){
             <span class="status-pill ${bFaults.length ? 'cancelada' : 'pagado'}">${bFaults.length ? bFaults.length + ' fallo(s)' : 'Operativo'}</span>
           </div>
           <div style="display:flex;gap:16px;margin-top:10px;">
-            <div><div style="font-size:18px;font-weight:700;color:var(--wave);">${bTrips.length}</div><div style="font-size:11px;color:var(--dmuted);">VIAJES</div></div>
+            <div><div style="font-size:18px;font-weight:700;color:var(--wave);">${bRealTrips.length}</div><div style="font-size:11px;color:var(--dmuted);">VIAJES</div></div>
             <div><div style="font-size:18px;font-weight:700;color:var(--wave);">${engineHours.toFixed(1)}h</div><div style="font-size:11px;color:var(--dmuted);">MOTOR</div></div>
             ${cost > 0 ? `<div><div style="font-size:18px;font-weight:700;color:${balance <= Number(b.fuel_alert_at||0) ? 'var(--danger)' : 'var(--gold)'};">${fmtMoney(balance)}</div><div style="font-size:11px;color:var(--dmuted);">COMBUSTIBLE</div></div>` : ''}
           </div>
@@ -1628,7 +1659,7 @@ async function loadViajes(){
       callRpc('list_trips', { p_token: session.token }),
       callRpc('list_boats', { p_token: session.token })
     ]);
-    viajesState.trips = trips;
+    viajesState.trips = trips.filter(t => !isCalibrationTrip(t));
     viajesState.boats = boats;
     boats.forEach(b => boatsById[b.id] = b.name);
     renderViajes();
@@ -2024,8 +2055,110 @@ function renderReportesDirectos(reservations){
   }).join('');
 }
 
+let combustibleState = { trips: [], boats: [] };
+
+async function loadCombustible(){
+  try{
+    const [trips, boats] = await Promise.all([
+      callRpc('list_trips', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+    combustibleState.trips = trips;
+    combustibleState.boats = boats;
+    boats.forEach(b => boatsById[b.id] = b.name);
+    renderCombustible();
+  }catch(e){ showToast('No se pudo cargar combustible: ' + e.message, 'error'); }
+}
+
+function renderCombustible(){
+  const { trips, boats } = combustibleState;
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('combustibleMonthTitle').textContent = `Gasto de combustible — ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
+
+  let monthGrandTotal = 0;
+  const monthCards = boats.map(b => {
+    const spend = trips
+      .filter(t => t.boat_id === b.id && t.fuel_amount && !isCalibrationTrip(t))
+      .filter(t => (t.departure_time || '').slice(0,7) === monthKey)
+      .reduce((s,t) => s + Number(t.fuel_amount||0), 0);
+    monthGrandTotal += spend;
+    return `<div class="stat-card"><div class="label">${escapeHtml(b.name)}</div><div class="value">${fmtMoney(spend)}</div></div>`;
+  }).join('') + `<div class="stat-card"><div class="label">Total flota</div><div class="value" style="color:var(--gold);">${fmtMoney(monthGrandTotal)}</div></div>`;
+  document.getElementById('combustibleMonthly').innerHTML = monthCards;
+
+  document.getElementById('combustibleSaldos').innerHTML = boats.map(b => {
+    const bTrips = trips.filter(t => t.boat_id === b.id);
+    const bRealTrips = bTrips.filter(t => !isCalibrationTrip(t));
+    const totalLoaded = bTrips.reduce((s,t) => s + Number(t.fuel_amount||0), 0);
+    const cost = Number(b.fuel_cost_per_trip || 0);
+    const balance = totalLoaded - (bRealTrips.length * cost);
+    const low = balance <= Number(b.fuel_alert_at||0);
+    return `<div class="item-card" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <div>
+        <h3>${escapeHtml(b.name)}</h3>
+        <div class="meta" style="color:${low ? 'var(--danger)' : 'var(--dtext)'};font-weight:700;">${fmtMoney(balance)}</div>
+      </div>
+      <button class="btn secondary" onclick="showAdjustFuelModal('${b.id}', ${balance})">Ajustar</button>
+    </div>`;
+  }).join('');
+
+  const fuelRecords = trips.filter(t => t.fuel_amount).slice().sort((a,b) => new Date(b.departure_time||0) - new Date(a.departure_time||0));
+  const empty = document.getElementById('combustibleEmpty');
+  empty.classList.toggle('hidden', fuelRecords.length > 0);
+  document.getElementById('combustibleBitacora').innerHTML = fuelRecords.map(t => {
+    const isCal = isCalibrationTrip(t);
+    return `<div class="item-card">
+      <h3>${escapeHtml(boatsById[t.boat_id] || 'Barco')}</h3>
+      <div class="meta">${fmtDateTime(t.departure_time)} · ${fmtMoney(t.fuel_amount)}</div>
+      ${t.notes ? `<div class="meta">${escapeHtml(t.notes)}</div>` : ''}
+      ${isCal ? `<span class="chip active" style="cursor:default;">Ajuste</span>` : ''}
+      <div><button class="btn secondary" style="margin-top:10px;color:var(--danger);" onclick="deleteFuelRecordUI('${t.id}')">Eliminar</button></div>
+    </div>`;
+  }).join('');
+}
+
+function showAdjustFuelModal(boatId, calculatedBalance){
+  const boat = combustibleState.boats.find(b => b.id === boatId);
+  document.getElementById('adjustFuelBoatLabel').textContent = `${boat ? boat.name : 'Barco'} · saldo calculado: ${fmtMoney(calculatedBalance)}`;
+  document.getElementById('adjustFuelRealBalance').value = '';
+  document.getElementById('adjustFuelModal').dataset.boatId = boatId;
+  document.getElementById('adjustFuelModal').dataset.calculatedBalance = calculatedBalance;
+  openModal('adjustFuelModal');
+}
+
+async function submitAdjustFuel(){
+  const modal = document.getElementById('adjustFuelModal');
+  const boatId = modal.dataset.boatId;
+  const calculatedBalance = Number(modal.dataset.calculatedBalance);
+  const realInput = document.getElementById('adjustFuelRealBalance').value;
+  const real = Number(realInput);
+  if (realInput === '' || isNaN(real)) return showToast('Ingresa el saldo real', 'error');
+  const diff = real - calculatedBalance;
+  if (diff === 0) { showToast('Ya coincide, sin cambios'); closeModal('adjustFuelModal'); return; }
+  try{
+    await callRpc('create_trip', { p_token: session.token, p_boat_id: boatId, p_fuel_amount: diff, p_notes: `Ajuste de saldo: calibración por ${session.name} (saldo real ${fmtMoney(real)})` });
+    closeModal('adjustFuelModal');
+    showToast('Saldo ajustado');
+    await loadCombustible();
+  }catch(e){ showToast('Error al ajustar: ' + e.message, 'error'); }
+}
+
+async function deleteFuelRecordUI(tripId){
+  if (!confirm('¿Eliminar este registro de combustible?')) return;
+  try{
+    await callRpc('delete_fuel_record', { p_token: session.token, p_trip_id: tripId });
+    showToast('Registro eliminado');
+    await loadCombustible();
+  }catch(e){ showToast('Error al eliminar: ' + e.message, 'error'); }
+}
+
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function isCalibrationTrip(t){
+  return !!(t.notes && t.notes.startsWith('Ajuste de saldo:'));
 }
 
 function fmtMoney(n){
