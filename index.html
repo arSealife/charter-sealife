@@ -15,6 +15,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;600;700&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root{
     --navy:#0a1628;--deep:#0d1f3c;--ocean:#0e3460;--wave:#1a5276;--teal:#0e8a7a;
@@ -313,6 +315,10 @@
       <div class="section-title">
         <h2>Gastos</h2>
         <button class="add-btn" onclick="openAddExpense()">+ Registrar gasto</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;">
+        <input type="month" id="cuadreMonthPicker" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(0,60,120,0.15);font-family:'Rajdhani',sans-serif;font-size:14px;color:var(--dtext);">
+        <button class="btn secondary" style="width:auto;margin-top:0;padding:9px 16px;" onclick="downloadGastosCuadre()"><i class="fa-solid fa-file-pdf"></i> Descargar Cuadre</button>
       </div>
       <div id="expensesSummary" class="stats-row"></div>
       <div id="expensesGrid" class="cards-grid"></div>
@@ -1500,6 +1506,11 @@ async function loadExpenses(){
   const grid = document.getElementById('expensesGrid');
   const empty = document.getElementById('expensesEmpty');
   const summary = document.getElementById('expensesSummary');
+  const cuadrePicker = document.getElementById('cuadreMonthPicker');
+  if (cuadrePicker && !cuadrePicker.value) {
+    const now = new Date();
+    cuadrePicker.value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  }
   grid.innerHTML = '';
   try{
     const [expenses, boats] = await Promise.all([
@@ -2151,6 +2162,234 @@ async function deleteFuelRecordUI(tripId){
     showToast('Registro eliminado');
     await loadCombustible();
   }catch(e){ showToast('Error al eliminar: ' + e.message, 'error'); }
+}
+
+async function downloadGastosCuadre(){
+  const picker = document.getElementById('cuadreMonthPicker');
+  let month, year;
+  if (picker && picker.value) {
+    const [py, pm] = picker.value.split('-');
+    year = Number(py); month = Number(pm) - 1;
+  } else {
+    const now = new Date();
+    month = now.getMonth(); year = now.getFullYear();
+  }
+  showToast('Generando PDF...');
+  try{
+    const { jsPDF } = window.jspdf;
+    const pad = n => String(n).padStart(2,'0');
+    const firstDay = `${year}-${pad(month+1)}-01`;
+    const lastDay = `${year}-${pad(month+1)}-${new Date(year, month+1, 0).getDate()}`;
+
+    const [reservations, expenses, boats] = await Promise.all([
+      callRpc('list_reservations', { p_token: session.token }),
+      callRpc('list_expenses', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+
+    const resInMonth = reservations.filter(r => r.reservation_date >= firstDay && r.reservation_date <= lastDay);
+    const expInMonth = expenses.filter(e => e.expense_date >= firstDay && e.expense_date <= lastDay);
+
+    const palette = [[52,152,219],[155,89,182],[231,76,60],[39,174,96],[243,156,18],[26,188,156],[142,68,173],[52,73,94]];
+    const boatColor = {};
+    boats.forEach((b,i) => boatColor[b.id] = palette[i % palette.length]);
+
+    const income = {}, incomeDirect = {};
+    boats.forEach(b => { income[b.id] = 0; incomeDirect[b.id] = 0; });
+    resInMonth.forEach(r => {
+      if (!(r.boat_id in income)) return;
+      if (r.vendor_id) income[r.boat_id] += Number(r.amount||0);
+      else incomeDirect[r.boat_id] += Number(r.amount||0);
+    });
+
+    const CATS = [
+      ['combustible','Combustible'], ['mantenimiento','Mantenimiento'], ['refacciones','Refacciones'],
+      ['nomina','NÃ³mina'], ['marina','Marina / atraque'], ['seguros','Seguros'], ['otro','Otro']
+    ];
+    const expByBoat = {}, expByCat = {};
+    boats.forEach(b => expByBoat[b.id] = 0);
+    CATS.forEach(([key]) => { expByCat[key] = {}; boats.forEach(b => expByCat[key][b.id] = 0); });
+    let genExp = 0;
+    expInMonth.forEach(e => {
+      if (e.boat_id && expByBoat[e.boat_id] !== undefined) expByBoat[e.boat_id] += Number(e.amount||0);
+      else if (!e.boat_id) genExp += Number(e.amount||0);
+      if (e.boat_id && expByCat[e.category] && expByCat[e.category][e.boat_id] !== undefined) {
+        expByCat[e.category][e.boat_id] += Number(e.amount||0);
+      }
+    });
+
+    const doc = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+    const W = 210, M = 14;
+    let y = 15;
+
+    doc.setFillColor(10,22,40);
+    doc.rect(0,0,W,28,'F');
+    doc.setFontSize(18); doc.setTextColor(201,168,76); doc.setFont('helvetica','bold');
+    doc.text(session.company_name || 'Charter Sealife', M, 12);
+    doc.setFontSize(13); doc.setTextColor(255,255,255);
+    doc.text('Reporte Mensual â ' + MONTH_NAMES[month] + ' ' + year, M, 21);
+    doc.setFontSize(9); doc.setTextColor(180,180,180);
+    doc.text('Generado: ' + new Date().toLocaleDateString('es-MX'), W-M, 21, {align:'right'});
+    y = 36;
+
+    const totalIncome = boats.reduce((s,b) => s + income[b.id] + incomeDirect[b.id], 0);
+    const totalExp = boats.reduce((s,b) => s + expByBoat[b.id], 0) + genExp;
+    const totalUtil = totalIncome - totalExp;
+    const cards = [
+      {label:'INGRESOS', value:'$'+totalIncome.toLocaleString(), color:[39,174,96]},
+      {label:'GASTOS', value:'$'+totalExp.toLocaleString(), color:[192,57,43]},
+      {label:'UTILIDAD', value:'$'+Math.abs(totalUtil).toLocaleString()+(totalUtil<0?' (-)':''), color: totalUtil>=0?[26,82,118]:[150,50,50]}
+    ];
+    const cw = (W-2*M-8)/3;
+    cards.forEach((card,i) => {
+      const cx = M + i*(cw+4);
+      doc.setFillColor(...card.color);
+      doc.roundedRect(cx, y, cw, 16, 2, 2, 'F');
+      doc.setFontSize(7); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+      doc.text(card.label, cx+cw/2, y+5, {align:'center'});
+      doc.setFontSize(11);
+      doc.text(card.value+' MXN', cx+cw/2, y+12, {align:'center'});
+    });
+    y += 24;
+
+    if (!boats.length) {
+      doc.setFontSize(11); doc.setTextColor(100,100,100);
+      doc.text('No hay barcos registrados.', M, y+10);
+    } else {
+      doc.setFillColor(10,22,40);
+      doc.rect(M, y, W-2*M, 8, 'F');
+      doc.setFontSize(11); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+      doc.text('Resumen Comparativo por Barco', M+3, y+5.5);
+      y += 11;
+
+      const colStyles = {0:{fontStyle:'bold'}};
+      boats.forEach((b,i) => { colStyles[i+1] = {halign:'right'}; });
+      colStyles[boats.length+1] = {halign:'right', fontStyle:'bold'};
+
+      doc.autoTable({
+        startY: y,
+        head: [['Concepto', ...boats.map(b=>b.name), 'TOTAL']],
+        body: [
+          ['Ingresos con vendedor', ...boats.map(b=>'$'+income[b.id].toLocaleString()), '$'+boats.reduce((s,b)=>s+income[b.id],0).toLocaleString()],
+          ['Ingresos directos', ...boats.map(b=>'$'+incomeDirect[b.id].toLocaleString()), '$'+boats.reduce((s,b)=>s+incomeDirect[b.id],0).toLocaleString()],
+          ['Total Ingresos', ...boats.map(b=>'$'+(income[b.id]+incomeDirect[b.id]).toLocaleString()), '$'+totalIncome.toLocaleString()],
+          ['Total Gastos', ...boats.map(b=>'$'+expByBoat[b.id].toLocaleString()), '$'+boats.reduce((s,b)=>s+expByBoat[b.id],0).toLocaleString()],
+          ['Utilidad', ...boats.map(b=>'$'+(income[b.id]+incomeDirect[b.id]-expByBoat[b.id]).toLocaleString()), '$'+(totalIncome-boats.reduce((s,b)=>s+expByBoat[b.id],0)).toLocaleString()]
+        ],
+        theme: 'grid',
+        headStyles: {fillColor:[26,58,108], textColor:[255,255,255], fontSize:8, fontStyle:'bold'},
+        bodyStyles: {fontSize:8},
+        columnStyles: colStyles,
+        margin: {left:M, right:M},
+        didParseCell: function(data) {
+          if (data.row.raw[0]==='Utilidad') { data.cell.styles.fillColor=[220,235,255]; data.cell.styles.fontStyle='bold'; }
+          if (data.row.raw[0]==='Total Ingresos') { data.cell.styles.fillColor=[220,240,220]; }
+          if (data.row.raw[0]==='Total Gastos') { data.cell.styles.fillColor=[250,220,220]; }
+        }
+      });
+      y = doc.lastAutoTable.finalY + 6;
+
+      if (genExp > 0) {
+        doc.setFontSize(8); doc.setTextColor(120,60,60); doc.setFont('helvetica','italic');
+        doc.text('Gastos generales (sin barco asignado): $'+genExp.toLocaleString()+' MXN â incluidos en GASTOS total.', M, y+3);
+        y += 9;
+      }
+
+      // Bar chart
+      if (y > 195) { doc.addPage(); y = 15; }
+      doc.setFillColor(10,22,40);
+      doc.rect(M, y, W-2*M, 8, 'F');
+      doc.setFontSize(11); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+      doc.text('GrÃ¡fico: Ingresos vs Gastos por Barco', M+3, y+5.5);
+      y += 13;
+
+      const chartH = 45, chartW = W-2*M-10;
+      const maxVal = Math.max(1, ...boats.map(b=>income[b.id]+incomeDirect[b.id]), ...boats.map(b=>expByBoat[b.id]));
+      const n = boats.length;
+      const barW = (chartW / n) / 3;
+      const gap = barW * 0.4;
+
+      doc.setDrawColor(200,200,200); doc.setLineWidth(0.2);
+      doc.line(M+8, y, M+8, y+chartH);
+      doc.line(M+8, y+chartH, M+8+chartW, y+chartH);
+
+      boats.forEach((b, i) => {
+        const col = boatColor[b.id];
+        const incomeY = income[b.id]+incomeDirect[b.id];
+        const expY = expByBoat[b.id];
+        const x = M+10 + i*(chartW/n);
+
+        const ih = (incomeY/maxVal)*chartH;
+        doc.setFillColor(col[0],col[1],col[2]);
+        doc.rect(x, y+chartH-ih, barW, ih, 'F');
+
+        const eh = (expY/maxVal)*chartH;
+        doc.setFillColor(200,70,60);
+        doc.rect(x+barW+gap, y+chartH-eh, barW, eh, 'F');
+
+        doc.setFontSize(7); doc.setTextColor(50,50,50); doc.setFont('helvetica','normal');
+        doc.text(b.name, x+barW, y+chartH+4, {align:'center'});
+
+        if (incomeY>0) { doc.setTextColor(col[0],col[1],col[2]); doc.setFontSize(6); doc.text('$'+Math.round(incomeY/1000)+'K', x+barW/2, y+chartH-ih-1.5, {align:'center'}); }
+        if (expY>0) { doc.setTextColor(200,70,60); doc.setFontSize(6); doc.text('$'+Math.round(expY/1000)+'K', x+barW+gap+barW/2, y+chartH-eh-1.5, {align:'center'}); }
+      });
+
+      y += chartH+10;
+      doc.setFillColor(52,152,219); doc.rect(M+8, y, 6, 4, 'F');
+      doc.setFontSize(7); doc.setTextColor(50,50,50); doc.text('Ingresos', M+16, y+3);
+      doc.setFillColor(200,70,60); doc.rect(M+40, y, 6, 4, 'F');
+      doc.text('Gastos', M+48, y+3);
+
+      // Per boat detail pages
+      boats.forEach(b => {
+        const col = boatColor[b.id];
+        const totalIncomeB = income[b.id]+incomeDirect[b.id];
+        const totalExpB = expByBoat[b.id];
+        const utilB = totalIncomeB - totalExpB;
+
+        doc.addPage();
+        let py = 15;
+
+        doc.setFillColor(col[0],col[1],col[2]);
+        doc.rect(M, py, W-2*M, 8, 'F');
+        doc.setFontSize(11); doc.setTextColor(255,255,255); doc.setFont('helvetica','bold');
+        doc.text(b.name, M+3, py+5.5);
+        doc.setFontSize(9);
+        doc.text('Utilidad: $'+Math.abs(utilB).toLocaleString()+(utilB<0?' (-)':' MXN'), W-M, py+5.5, {align:'right'});
+        py += 11;
+
+        doc.autoTable({
+          startY: py,
+          head: [['Concepto','Monto MXN']],
+          body: [
+            ['Ingresos con vendedor', '$'+income[b.id].toLocaleString()],
+            ['Ingresos directos', '$'+incomeDirect[b.id].toLocaleString()],
+            ['TOTAL INGRESOS', '$'+totalIncomeB.toLocaleString()],
+            ...CATS.map(([key,label]) => [label, expByCat[key][b.id]>0 ? '$'+expByCat[key][b.id].toLocaleString() : '-']),
+            ['TOTAL GASTOS', '$'+totalExpB.toLocaleString()],
+            ['UTILIDAD NETA', (utilB>=0?'+':'-')+'$'+Math.abs(utilB).toLocaleString()]
+          ],
+          theme: 'grid',
+          headStyles: {fillColor: col, textColor:[255,255,255], fontSize:8, fontStyle:'bold'},
+          bodyStyles: {fontSize:7.5},
+          columnStyles: {1:{halign:'right'}},
+          margin: {left:M, right:M},
+          didParseCell: function(data) {
+            if (data.row.raw[0]==='TOTAL INGRESOS') { data.cell.styles.fillColor=[220,240,220]; data.cell.styles.fontStyle='bold'; }
+            if (data.row.raw[0]==='TOTAL GASTOS') { data.cell.styles.fillColor=[250,220,220]; data.cell.styles.fontStyle='bold'; }
+            if (data.row.raw[0]==='UTILIDAD NETA') {
+              data.cell.styles.fillColor = utilB>=0?[200,230,200]:[250,200,200];
+              data.cell.styles.fontStyle='bold';
+              data.cell.styles.fontSize=8;
+            }
+          }
+        });
+      });
+    }
+
+    doc.save('Cuadre_'+MONTH_NAMES[month]+'_'+year+'.pdf');
+    showToast('PDF generado');
+  }catch(e){ showToast('Error al generar PDF: ' + e.message, 'error'); }
 }
 
 function escapeHtml(s){
