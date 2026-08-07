@@ -125,6 +125,10 @@
   .cal-legend-count{background:var(--dot,#1a5276);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;}
   .cal-legend-total{font-size:12px;color:var(--dtext);font-weight:700;}
   .cal-legend-total span{background:rgba(0,0,0,0.1);border-radius:10px;padding:1px 7px;}
+  /* ── FILTER CHIPS ── */
+  .chip-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+  .chip{background:rgba(0,60,120,0.06);border:1px solid rgba(0,60,120,0.15);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--dtext);cursor:pointer;font-family:'Rajdhani',sans-serif;}
+  .chip.active{background:var(--wave);border-color:var(--wave);color:#fff;}
 
   /* ── TOAST ── */
   .toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%) translateY(-100px);background:rgba(39,174,96,.95);color:#fff;padding:.75rem 1.5rem;border-radius:25px;font-weight:600;font-size:14px;z-index:9999;transition:transform .3s;box-shadow:0 4px 20px rgba(0,0,0,.3);}
@@ -246,6 +250,7 @@
       <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')"><i class="fa-solid fa-chart-bar"></i>Reportes</button>
       <button class="tab-btn hidden" id="tabBtnGastos" onclick="switchTab('gastos')"><i class="fa-solid fa-sack-dollar"></i>Gastos</button>
       <button class="tab-btn hidden" id="tabBtnViajes" onclick="switchTab('viajes')"><i class="fa-solid fa-route"></i>Viajes</button>
+      <button class="tab-btn hidden" id="tabBtnFallos" onclick="switchTab('fallos')"><i class="fa-solid fa-triangle-exclamation"></i>Fallos</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel">
@@ -325,6 +330,16 @@
       </div>
       <div id="viajesQuincenas"></div>
       <div id="viajesEmpty" class="empty-state hidden">Sin viajes registrados este mes.</div>
+    </div>
+
+    <div id="panelFallos" class="tab-panel">
+      <div class="section-title">
+        <h2>Fallos</h2>
+        <button class="add-btn" onclick="openAddFaultAdmin()">+ Nuevo fallo</button>
+      </div>
+      <div id="faultsFilters"></div>
+      <div id="faultsGrid" class="cards-grid"></div>
+      <div id="faultsEmpty" class="empty-state hidden">Sin fallos reportados.</div>
     </div>
 
     <div id="panelOperacion" class="tab-panel active">
@@ -648,6 +663,20 @@
   </div>
 </div>
 
+<div id="addFaultAdminModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Nuevo fallo</h3>
+    <label>Barco</label>
+    <select id="newFaultAdminBoat"></select>
+    <label>Descripción</label>
+    <input id="newFaultAdminDesc" placeholder="ej. Motor pierde potencia a bajas RPM">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addFaultAdminModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddFaultAdmin()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="addExpenseModal" class="modal-bg hidden">
   <div class="modal">
     <h3>Registrar gasto</h3>
@@ -944,6 +973,7 @@ async function enterDashboard(){
   document.getElementById('tabBtnReportes').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnGastos').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnViajes').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnFallos').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnOperacion').classList.toggle('hidden', !isAdmin);
   document.getElementById('telegramBtn').classList.toggle('hidden', !isAdmin);
   const subBtn = document.getElementById('subscribeHeaderBtn');
@@ -968,7 +998,7 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7 };
+  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
@@ -981,6 +1011,7 @@ function switchTab(name){
     if (name === 'gastos') loadExpenses();
     if (name === 'operacion') loadOperacion();
     if (name === 'viajes') loadViajes();
+    if (name === 'fallos') loadFallosAdmin();
   }
 }
 
@@ -1572,6 +1603,94 @@ function renderViajes(){
   document.getElementById('viajesQuincenas').innerHTML =
     quincenaBlock('1ra quincena (1–15)', q1) +
     quincenaBlock(`2da quincena (16–${daysInMonth})`, q2);
+}
+
+let faultsAdminState = { faults: [], boats: [], filterBoat: 'all', filterStatus: 'all' };
+
+async function loadFallosAdmin(){
+  try{
+    const [faults, boats] = await Promise.all([
+      callRpc('list_faults', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+    boats.forEach(b => boatsById[b.id] = b.name);
+    faultsAdminState.faults = faults;
+    faultsAdminState.boats = boats;
+    renderFaultsFilters();
+    renderFaultsAdmin();
+  }catch(e){ showToast('No se pudieron cargar los fallos: ' + e.message, 'error'); }
+}
+
+function renderFaultsFilters(){
+  const { boats, filterBoat, filterStatus } = faultsAdminState;
+  const boatChips = [{id:'all', name:'Todos'}].concat(boats).map(b =>
+    `<button class="chip${filterBoat===b.id?' active':''}" onclick="setFaultsFilterBoat('${b.id}')">${escapeHtml(b.name)}</button>`
+  ).join('');
+  const statuses = [['all','Todos los estados'],['pendiente','Pendiente'],['en_proceso','En proceso'],['resuelto','Resuelto']];
+  const statusChips = statuses.map(([s,label]) =>
+    `<button class="chip${filterStatus===s?' active':''}" onclick="setFaultsFilterStatus('${s}')">${label}</button>`
+  ).join('');
+  document.getElementById('faultsFilters').innerHTML =
+    `<div class="chip-row">${boatChips}</div><div class="chip-row">${statusChips}</div>`;
+}
+
+function setFaultsFilterBoat(boatId){ faultsAdminState.filterBoat = boatId; renderFaultsFilters(); renderFaultsAdmin(); }
+function setFaultsFilterStatus(status){ faultsAdminState.filterStatus = status; renderFaultsFilters(); renderFaultsAdmin(); }
+
+function renderFaultsAdmin(){
+  const { faults, filterBoat, filterStatus } = faultsAdminState;
+  const grid = document.getElementById('faultsGrid');
+  const empty = document.getElementById('faultsEmpty');
+  const filtered = faults.filter(f => (filterBoat === 'all' || f.boat_id === filterBoat) && (filterStatus === 'all' || f.status === filterStatus));
+  grid.innerHTML = '';
+  if (!filtered.length){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  filtered.slice().sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).forEach(f => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `<h3>${escapeHtml(boatsById[f.boat_id] || 'Barco')}</h3>
+      <div class="meta">${escapeHtml(f.description || '')}</div>
+      <div class="meta">${fmtDateTime(f.created_at)}</div>
+      <span class="status-pill ${f.status}">${faultStatusLabel(f.status)}</span>
+      <div style="margin-top:8px;">
+        <select onchange="changeFaultStatusAdmin('${f.id}', this.value)">
+          <option value="pendiente" ${f.status==='pendiente'?'selected':''}>Pendiente</option>
+          <option value="en_proceso" ${f.status==='en_proceso'?'selected':''}>En proceso</option>
+          <option value="resuelto" ${f.status==='resuelto'?'selected':''}>Resuelto</option>
+        </select>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+async function changeFaultStatusAdmin(faultId, status){
+  try{
+    await callRpc('update_fault_status', { p_token: session.token, p_fault_id: faultId, p_status: status });
+    showToast('Estado actualizado');
+    await loadFallosAdmin();
+  }catch(e){ showToast('Error al actualizar: ' + e.message, 'error'); }
+}
+
+async function openAddFaultAdmin(){
+  try{
+    const boats = await callRpc('list_boats', { p_token: session.token });
+    const sel = document.getElementById('newFaultAdminBoat');
+    sel.innerHTML = boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  }catch(e){}
+  document.getElementById('newFaultAdminDesc').value = '';
+  openModal('addFaultAdminModal');
+}
+
+async function submitAddFaultAdmin(){
+  const boatId = document.getElementById('newFaultAdminBoat').value;
+  const description = document.getElementById('newFaultAdminDesc').value.trim();
+  if (!boatId || !description) return showToast('Completa barco y descripción.', 'error');
+  try{
+    await callRpc('create_fault', { p_token: session.token, p_boat_id: boatId, p_description: description });
+    closeModal('addFaultAdminModal');
+    showToast('Fallo registrado');
+    await loadFallosAdmin();
+  }catch(e){ showToast('Error al registrar: ' + e.message, 'error'); }
 }
 
 function escapeHtml(s){
