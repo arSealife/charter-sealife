@@ -251,6 +251,7 @@
       <button class="tab-btn hidden" id="tabBtnGastos" onclick="switchTab('gastos')"><i class="fa-solid fa-sack-dollar"></i>Gastos</button>
       <button class="tab-btn hidden" id="tabBtnViajes" onclick="switchTab('viajes')"><i class="fa-solid fa-route"></i>Viajes</button>
       <button class="tab-btn hidden" id="tabBtnFallos" onclick="switchTab('fallos')"><i class="fa-solid fa-triangle-exclamation"></i>Fallos</button>
+      <button class="tab-btn hidden" id="tabBtnPiezas" onclick="switchTab('piezas')"><i class="fa-solid fa-screwdriver-wrench"></i>Piezas</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel">
@@ -340,6 +341,16 @@
       <div id="faultsFilters"></div>
       <div id="faultsGrid" class="cards-grid"></div>
       <div id="faultsEmpty" class="empty-state hidden">Sin fallos reportados.</div>
+    </div>
+
+    <div id="panelPiezas" class="tab-panel">
+      <div class="section-title">
+        <h2>Piezas</h2>
+        <button class="add-btn" onclick="openAddPartAdmin()">+ Nuevo pedido</button>
+      </div>
+      <div id="partsFilters"></div>
+      <div id="partsAdminGrid" class="cards-grid"></div>
+      <div id="partsAdminEmpty" class="empty-state hidden">Sin pedidos de refacciones.</div>
     </div>
 
     <div id="panelOperacion" class="tab-panel active">
@@ -677,6 +688,27 @@
   </div>
 </div>
 
+<div id="addPartAdminModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Nuevo pedido de refacción</h3>
+    <label>Barco</label>
+    <select id="newPartAdminBoat"></select>
+    <label>Refacción</label>
+    <input id="newPartAdminName" placeholder="ej. Filtro de aceite">
+    <label>Cantidad</label>
+    <input id="newPartAdminQuantity" type="number" min="1" step="1" value="1">
+    <label>Urgencia</label>
+    <select id="newPartAdminUrgency">
+      <option value="normal">Normal</option>
+      <option value="urgente">Urgente</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('addPartAdminModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitAddPartAdmin()">Pedir</button>
+    </div>
+  </div>
+</div>
+
 <div id="addExpenseModal" class="modal-bg hidden">
   <div class="modal">
     <h3>Registrar gasto</h3>
@@ -974,6 +1006,7 @@ async function enterDashboard(){
   document.getElementById('tabBtnGastos').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnViajes').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnFallos').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnPiezas').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnOperacion').classList.toggle('hidden', !isAdmin);
   document.getElementById('telegramBtn').classList.toggle('hidden', !isAdmin);
   const subBtn = document.getElementById('subscribeHeaderBtn');
@@ -998,7 +1031,7 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8 };
+  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8, piezas: 9 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
@@ -1012,6 +1045,7 @@ function switchTab(name){
     if (name === 'operacion') loadOperacion();
     if (name === 'viajes') loadViajes();
     if (name === 'fallos') loadFallosAdmin();
+    if (name === 'piezas') loadPartsAdmin();
   }
 }
 
@@ -1691,6 +1725,93 @@ async function submitAddFaultAdmin(){
     showToast('Fallo registrado');
     await loadFallosAdmin();
   }catch(e){ showToast('Error al registrar: ' + e.message, 'error'); }
+}
+
+let partsAdminState = { orders: [], boats: [], filterStatus: 'all' };
+
+async function loadPartsAdmin(){
+  try{
+    const [orders, boats] = await Promise.all([
+      callRpc('list_parts_orders', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+    boats.forEach(b => boatsById[b.id] = b.name);
+    partsAdminState.orders = orders;
+    partsAdminState.boats = boats;
+    renderPartsFilters();
+    renderPartsAdmin();
+  }catch(e){ showToast('No se pudieron cargar los pedidos: ' + e.message, 'error'); }
+}
+
+function renderPartsFilters(){
+  const { filterStatus } = partsAdminState;
+  const statuses = [['all','Todos'],['pendiente','Pendiente'],['ordenado','Ordenado'],['recibido','Recibido']];
+  const chips = statuses.map(([s,label]) =>
+    `<button class="chip${filterStatus===s?' active':''}" onclick="setPartsFilterStatus('${s}')">${label}</button>`
+  ).join('');
+  document.getElementById('partsFilters').innerHTML = `<div class="chip-row">${chips}</div>`;
+}
+
+function setPartsFilterStatus(status){ partsAdminState.filterStatus = status; renderPartsFilters(); renderPartsAdmin(); }
+
+function renderPartsAdmin(){
+  const { orders, filterStatus } = partsAdminState;
+  const grid = document.getElementById('partsAdminGrid');
+  const empty = document.getElementById('partsAdminEmpty');
+  const filtered = orders.filter(o => filterStatus === 'all' || o.status === filterStatus);
+  grid.innerHTML = '';
+  if (!filtered.length){ empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  filtered.slice().sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).forEach(o => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = `<h3>${escapeHtml(o.part_name)}</h3>
+      <div class="meta">${escapeHtml(boatsById[o.boat_id] || 'Barco')} · cantidad ${o.quantity}</div>
+      <div class="meta">${o.urgency === 'urgente' ? 'Urgente' : 'Normal'} · ${fmtDateTime(o.created_at)}</div>
+      <span class="status-pill ${o.status === 'recibido' ? 'pagado' : (o.status === 'ordenado' ? 'parcial' : 'pendiente')}">${partsStatusLabel(o.status)}</span>
+      <div style="margin-top:8px;">
+        <select onchange="changePartsStatusAdmin('${o.id}', this.value)">
+          <option value="pendiente" ${o.status==='pendiente'?'selected':''}>Pendiente</option>
+          <option value="ordenado" ${o.status==='ordenado'?'selected':''}>Ordenado</option>
+          <option value="recibido" ${o.status==='recibido'?'selected':''}>Recibido</option>
+        </select>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+
+async function changePartsStatusAdmin(orderId, status){
+  try{
+    await callRpc('update_parts_order_status', { p_token: session.token, p_order_id: orderId, p_status: status });
+    showToast('Estado actualizado');
+    await loadPartsAdmin();
+  }catch(e){ showToast('Error al actualizar: ' + e.message, 'error'); }
+}
+
+async function openAddPartAdmin(){
+  try{
+    const boats = await callRpc('list_boats', { p_token: session.token });
+    const sel = document.getElementById('newPartAdminBoat');
+    sel.innerHTML = boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  }catch(e){}
+  document.getElementById('newPartAdminName').value = '';
+  document.getElementById('newPartAdminQuantity').value = '1';
+  document.getElementById('newPartAdminUrgency').value = 'normal';
+  openModal('addPartAdminModal');
+}
+
+async function submitAddPartAdmin(){
+  const boatId = document.getElementById('newPartAdminBoat').value;
+  const partName = document.getElementById('newPartAdminName').value.trim();
+  const quantity = Number(document.getElementById('newPartAdminQuantity').value) || 1;
+  const urgency = document.getElementById('newPartAdminUrgency').value;
+  if (!boatId || !partName) return showToast('Elige barco y describe la refacción.', 'error');
+  try{
+    await callRpc('create_parts_order', { p_token: session.token, p_boat_id: boatId, p_part_name: partName, p_quantity: quantity, p_urgency: urgency });
+    closeModal('addPartAdminModal');
+    showToast('Pedido registrado');
+    await loadPartsAdmin();
+  }catch(e){ showToast('Error al pedir refacción: ' + e.message, 'error'); }
 }
 
 function escapeHtml(s){
