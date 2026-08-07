@@ -254,6 +254,7 @@
       <button class="tab-btn hidden" id="tabBtnPiezas" onclick="switchTab('piezas')"><i class="fa-solid fa-screwdriver-wrench"></i>Piezas</button>
       <button class="tab-btn hidden" id="tabBtnEmpresas" onclick="switchTab('empresas')"><i class="fa-solid fa-building"></i>Empresas</button>
       <button class="tab-btn hidden" id="tabBtnReporteEmpresas" onclick="switchTab('reporteEmpresas')"><i class="fa-solid fa-chart-line"></i>Reporte empresas</button>
+      <button class="tab-btn hidden" id="tabBtnReportesDirectos" onclick="switchTab('reportesDirectos')"><i class="fa-solid fa-file-invoice-dollar"></i>Reportes directos</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel">
@@ -372,6 +373,15 @@
       <div id="reporteEmpresasStats" class="stats-row"></div>
       <div id="reporteEmpresasMonths"></div>
       <div id="reporteEmpresasEmpty" class="empty-state hidden">Sin reservas de empresas con crédito.</div>
+    </div>
+
+    <div id="panelReportesDirectos" class="tab-panel">
+      <div class="section-title">
+        <h2>Reportes directos</h2>
+      </div>
+      <div id="directosStats" class="stats-row"></div>
+      <div id="directosMonths"></div>
+      <div id="directosEmpty" class="empty-state hidden">Sin reservas directas.</div>
     </div>
 
     <div id="panelOperacion" class="tab-panel active">
@@ -1030,6 +1040,7 @@ async function enterDashboard(){
   document.getElementById('tabBtnPiezas').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnEmpresas').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnReporteEmpresas').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnReportesDirectos').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnOperacion').classList.toggle('hidden', !isAdmin);
   document.getElementById('telegramBtn').classList.toggle('hidden', !isAdmin);
   const subBtn = document.getElementById('subscribeHeaderBtn');
@@ -1054,7 +1065,7 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8, piezas: 9, empresas: 10, reporteEmpresas: 11 };
+  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8, piezas: 9, empresas: 10, reporteEmpresas: 11, reportesDirectos: 12 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
@@ -1071,6 +1082,7 @@ function switchTab(name){
     if (name === 'piezas') loadPartsAdmin();
     if (name === 'empresas') loadEmpresas();
     if (name === 'reporteEmpresas') loadReporteEmpresas();
+    if (name === 'reportesDirectos') loadReportesDirectos();
   }
 }
 
@@ -1947,6 +1959,67 @@ function renderReporteEmpresas(reservations){
       <div style="margin-top:8px;background:rgba(0,60,120,0.08);border-radius:8px;height:8px;overflow:hidden;">
         <div style="width:${pct}%;height:100%;background:var(--wave);"></div>
       </div>
+    </div>`;
+  }).join('');
+}
+
+async function loadReportesDirectos(){
+  try{
+    const [reservations, boats] = await Promise.all([
+      callRpc('list_reservations', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+    const filtered = reservations.filter(r => !r.vendor_id);
+    boats.forEach(b => boatsById[b.id] = b.name);
+    renderReportesDirectos(filtered);
+  }catch(e){ showToast('No se pudo cargar el reporte de directos: ' + e.message, 'error'); }
+}
+
+function renderReportesDirectos(reservations){
+  const totalReservado = reservations.reduce((s,r) => s + Number(r.amount||0), 0);
+  const totalPagado = reservations.reduce((s,r) => s + Number(r.paid_amount||0), 0);
+  const pending = totalReservado - totalPagado;
+  document.getElementById('directosStats').innerHTML = `
+    <div class="stat-card"><div class="label">Total</div><div class="value">${fmtMoney(totalReservado)}</div></div>
+    <div class="stat-card"><div class="label">Anticipo</div><div class="value" style="color:var(--ok)">${fmtMoney(totalPagado)}</div></div>
+    <div class="stat-card"><div class="label">Pendiente</div><div class="value" style="color:${pending > 0 ? 'var(--danger)' : 'var(--ok)'}">${fmtMoney(pending)}</div></div>`;
+
+  const byMonth = {};
+  reservations.forEach(r => {
+    if (!r.reservation_date) return;
+    const [y, m] = r.reservation_date.split('-');
+    const key = `${y}-${m}`;
+    if (!byMonth[key]) byMonth[key] = { label: `${MONTH_NAMES[parseInt(m,10)-1]} ${y}`, list: [], total: 0 };
+    byMonth[key].list.push(r);
+    byMonth[key].total += Number(r.amount||0);
+  });
+  const keys = Object.keys(byMonth).sort().reverse();
+  const empty = document.getElementById('directosEmpty');
+  empty.classList.toggle('hidden', keys.length > 0);
+  document.getElementById('directosMonths').innerHTML = keys.map(key => {
+    const m = byMonth[key];
+    const sortedList = [...m.list].sort((a,b) => (a.reservation_date||'').localeCompare(b.reservation_date||''));
+    return `<div class="item-card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h3>${m.label}</h3>
+        <span class="chip active" style="cursor:default;">${m.list.length} reserva${m.list.length !== 1 ? 's' : ''}</span>
+      </div>
+      <div class="meta" style="margin-bottom:8px;">Total: ${fmtMoney(m.total)}</div>
+      ${sortedList.map(r => {
+        const paid = Number(r.paid_amount||0);
+        const pend = Number(r.amount||0) - paid;
+        return `<div style="padding:8px 0;border-top:1px solid rgba(0,60,120,0.08);">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span>${escapeHtml(boatsById[r.boat_id] || 'Barco')} · ${r.reservation_date}</span>
+            <span style="font-weight:700;color:var(--wave);">${fmtMoney(r.amount)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--dmuted);margin-top:2px;">
+            <span>Anticipo: ${fmtMoney(paid)}</span>
+            <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
+          </div>
+          ${pend > 0 ? `<button class="btn secondary" style="margin-top:6px;width:100%;" onclick="openRegisterPayment('${r.id}', ${pend})">Registrar pago</button>` : ''}
+        </div>`;
+      }).join('')}
     </div>`;
   }).join('');
 }
