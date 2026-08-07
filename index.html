@@ -245,6 +245,7 @@
       <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')"><i class="fa-solid fa-star"></i>Vendedores</button>
       <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')"><i class="fa-solid fa-chart-bar"></i>Reportes</button>
       <button class="tab-btn hidden" id="tabBtnGastos" onclick="switchTab('gastos')"><i class="fa-solid fa-sack-dollar"></i>Gastos</button>
+      <button class="tab-btn hidden" id="tabBtnViajes" onclick="switchTab('viajes')"><i class="fa-solid fa-route"></i>Viajes</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel">
@@ -306,6 +307,24 @@
       <div id="expensesSummary" class="stats-row"></div>
       <div id="expensesGrid" class="cards-grid"></div>
       <div id="expensesEmpty" class="empty-state hidden">Todavía no hay gastos registrados.</div>
+    </div>
+
+    <div id="panelViajes" class="tab-panel">
+      <div class="section-title">
+        <h2>Viajes</h2>
+      </div>
+      <div class="cal-nav" style="margin-bottom:14px;">
+        <button class="cal-nav-btn" onclick="changeViajesMonth(-1)">◀</button>
+        <div class="cal-month-label" id="viajesMonthLabel"></div>
+        <button class="cal-nav-btn" onclick="changeViajesMonth(1)">▶</button>
+      </div>
+      <div id="viajesBoatStats" class="stats-row"></div>
+      <div class="stat-card" id="viajesTotalCard" style="margin-top:12px;text-align:center;"></div>
+      <div class="section-title" style="margin-top:22px;">
+        <h2>Reporte quincenal</h2>
+      </div>
+      <div id="viajesQuincenas"></div>
+      <div id="viajesEmpty" class="empty-state hidden">Sin viajes registrados este mes.</div>
     </div>
 
     <div id="panelOperacion" class="tab-panel active">
@@ -924,6 +943,7 @@ async function enterDashboard(){
   document.getElementById('tabBtnVendedores').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnReportes').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnGastos').classList.toggle('hidden', !isAdmin);
+  document.getElementById('tabBtnViajes').classList.toggle('hidden', !isAdmin);
   document.getElementById('tabBtnOperacion').classList.toggle('hidden', !isAdmin);
   document.getElementById('telegramBtn').classList.toggle('hidden', !isAdmin);
   const subBtn = document.getElementById('subscribeHeaderBtn');
@@ -948,7 +968,7 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6 };
+  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
@@ -960,6 +980,7 @@ function switchTab(name){
     if (name === 'reportes') loadReports();
     if (name === 'gastos') loadExpenses();
     if (name === 'operacion') loadOperacion();
+    if (name === 'viajes') loadViajes();
   }
 }
 
@@ -1495,6 +1516,62 @@ async function loadOperacion(){
       });
     }
   }catch(e){ showToast('No se pudo cargar la operación: ' + e.message, 'error'); }
+}
+
+let viajesState = { month: today.getMonth(), year: today.getFullYear(), trips: [], boats: [] };
+
+async function loadViajes(){
+  try{
+    const [trips, boats] = await Promise.all([
+      callRpc('list_trips', { p_token: session.token }),
+      callRpc('list_boats', { p_token: session.token })
+    ]);
+    viajesState.trips = trips;
+    viajesState.boats = boats;
+    boats.forEach(b => boatsById[b.id] = b.name);
+    renderViajes();
+  }catch(e){ showToast('No se pudieron cargar los viajes: ' + e.message, 'error'); }
+}
+
+function changeViajesMonth(delta){
+  viajesState.month += delta;
+  if (viajesState.month < 0) { viajesState.month = 11; viajesState.year--; }
+  if (viajesState.month > 11) { viajesState.month = 0; viajesState.year++; }
+  renderViajes();
+}
+
+function renderViajes(){
+  const { month, year, trips, boats } = viajesState;
+  document.getElementById('viajesMonthLabel').textContent = `${MONTH_NAMES[month]} ${year}`;
+  const monthTrips = trips.filter(t => {
+    if (!t.departure_time) return false;
+    const d = new Date(t.departure_time);
+    return d.getMonth() === month && d.getFullYear() === year;
+  });
+  const empty = document.getElementById('viajesEmpty');
+  empty.classList.toggle('hidden', monthTrips.length > 0);
+
+  document.getElementById('viajesBoatStats').innerHTML = boats.map(b => {
+    const count = monthTrips.filter(t => t.boat_id === b.id).length;
+    return `<div class="stat-card"><div class="label">${escapeHtml(b.name)}</div><div class="value">${count}</div></div>`;
+  }).join('');
+  document.getElementById('viajesTotalCard').innerHTML = `<div class="label">TOTAL VIAJES DEL MES</div><div class="value">${monthTrips.length}</div>`;
+
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const dayOf = t => new Date(t.departure_time).getDate();
+  const q1 = monthTrips.filter(t => dayOf(t) <= 15);
+  const q2 = monthTrips.filter(t => dayOf(t) >= 16);
+  const quincenaBlock = (label, list) => `
+    <div class="item-card" style="margin-bottom:10px;">
+      <h3>${label}</h3>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;">
+        ${boats.map(b => `<div style="text-align:center;"><div style="font-size:18px;font-weight:700;color:var(--wave);">${list.filter(t=>t.boat_id===b.id).length}</div><div style="font-size:11px;color:var(--dmuted);">${escapeHtml(b.name.toUpperCase())}</div></div>`).join('')}
+      </div>
+      <div class="meta" style="margin-top:8px;text-align:right;">Total: <b>${list.length}</b></div>
+    </div>`;
+  document.getElementById('viajesQuincenas').innerHTML =
+    quincenaBlock('1ra quincena (1–15)', q1) +
+    quincenaBlock(`2da quincena (16–${daysInMonth})`, q2);
 }
 
 function escapeHtml(s){
