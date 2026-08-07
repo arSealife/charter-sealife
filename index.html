@@ -742,6 +742,26 @@
   </div>
 </div>
 
+<div id="boatMaintenanceModal" class="modal-bg hidden">
+  <div class="modal">
+    <h3>Mantenimiento</h3>
+    <input type="hidden" id="maintBoatId">
+    <div id="maintBoatLabel" class="meta" style="margin-bottom:8px;"></div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+      <input type="checkbox" id="maintBlocked" style="width:auto;">
+      <span>🔧 Bloquear barco por mantenimiento</span>
+    </label>
+    <label>Motivo (opcional)</label>
+    <input id="maintReason" placeholder="ej. Cambio de motor">
+    <label>Vuelve el (opcional)</label>
+    <input id="maintUntil" type="date">
+    <div class="modal-actions">
+      <button class="btn secondary" style="flex:1" onclick="closeModal('boatMaintenanceModal')">Cancelar</button>
+      <button class="btn" style="flex:1" onclick="submitBoatMaintenance()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div id="addFaultAdminModal" class="modal-bg hidden">
   <div class="modal">
     <h3>Nuevo fallo</h3>
@@ -1300,7 +1320,7 @@ async function openAddReservationFromCalendar(dateStr){
     try { calState.boats = await callRpc('list_boats', { p_token: session.token }); } catch(e){}
   }
   const sel = document.getElementById('newResBoat');
-  sel.innerHTML = calState.boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  sel.innerHTML = calState.boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}${b.maintenance_blocked ? ' (🔧 Mantenimiento)' : ''}</option>`).join('');
   document.getElementById('newResDate').value = dateStr || new Date().toISOString().slice(0,10);
   document.getElementById('newResHours').value = '';
   document.getElementById('newResAmount').value = '';
@@ -1327,8 +1347,11 @@ async function loadBoats(){
       const card = document.createElement('div');
       card.className = 'item-card' + (b.active ? '' : ' inactive');
       card.style.borderLeftColor = b.color || '#1a5276';
-      card.innerHTML = `<h3>${escapeHtml(b.name)}</h3><div class="meta">${b.tracker_id ? 'GPS vinculado' : 'Sin GPS configurado'}</div>${!b.active ? '<span class="badge">Inactivo</span>' : ''}
-        ${isAdmin ? `<button class="btn secondary" style="margin-top:10px;" onclick="openEditBoat('${b.id}')">Editar</button>` : ''}`;
+      card.innerHTML = `<h3>${escapeHtml(b.name)}</h3><div class="meta">${b.tracker_id ? 'GPS vinculado' : 'Sin GPS configurado'}</div>${!b.active ? '<span class="badge">Inactivo</span>' : ''}${b.maintenance_blocked ? `<span class="badge" style="background:rgba(231,76,60,0.15);color:#e74c3c;border-color:#e74c3c;">🔧 Mantenimiento${b.maintenance_until ? ' hasta '+b.maintenance_until : ''}</span>` : ''}
+        ${isAdmin ? `<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+          <button class="btn secondary" style="width:auto;margin-top:0;" onclick="openEditBoat('${b.id}')">Editar</button>
+          <button class="btn secondary" style="width:auto;margin-top:0;${b.maintenance_blocked ? 'color:#e74c3c;border-color:#e74c3c;' : ''}" onclick="openBoatMaintenance('${b.id}')">${b.maintenance_blocked ? 'Quitar mantenimiento' : '🔧 Mantenimiento'}</button>
+        </div>` : ''}`;
       grid.appendChild(card);
     });
   }catch(e){
@@ -1369,6 +1392,33 @@ async function submitEditBoat(){
     await loadBoats();
     showToast('Barco actualizado');
   }catch(e){ showToast('Error al actualizar barco: ' + e.message, 'error'); }
+}
+
+function openBoatMaintenance(boatId){
+  const b = boatsCache.find(x => x.id === boatId);
+  if (!b) return;
+  document.getElementById('maintBoatId').value = b.id;
+  document.getElementById('maintBoatLabel').textContent = b.name;
+  document.getElementById('maintBlocked').checked = !!b.maintenance_blocked;
+  document.getElementById('maintReason').value = b.maintenance_reason || '';
+  document.getElementById('maintUntil').value = b.maintenance_until || '';
+  openModal('boatMaintenanceModal');
+}
+
+async function submitBoatMaintenance(){
+  const id = document.getElementById('maintBoatId').value;
+  const blocked = document.getElementById('maintBlocked').checked;
+  const reason = document.getElementById('maintReason').value.trim();
+  const until = document.getElementById('maintUntil').value;
+  try{
+    await callRpc('set_boat_maintenance', {
+      p_token: session.token, p_boat_id: id, p_blocked: blocked,
+      p_reason: reason || null, p_until: until || null
+    });
+    closeModal('boatMaintenanceModal');
+    await loadBoats();
+    showToast(blocked ? 'Barco bloqueado por mantenimiento 🔧' : 'Barco disponible de nuevo ✅');
+  }catch(e){ showToast('Error al actualizar mantenimiento: ' + e.message, 'error'); }
 }
 
 async function loadUsers(){
@@ -2556,7 +2606,7 @@ async function enterVendorView(){
   boatsById = {};
   boats.forEach(b => boatsById[b.id] = b.name);
   const sel = document.getElementById('newResBoat');
-  sel.innerHTML = boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}</option>`).join('');
+  sel.innerHTML = boats.map(b => `<option value="${b.id}">${escapeHtml(b.name)}${b.maintenance_blocked ? ' (🔧 Mantenimiento)' : ''}</option>`).join('');
 
   await loadMyReservations();
 }
@@ -2704,7 +2754,7 @@ async function submitAddReservation(){
       }).catch(() => {});
     }
   }catch(e){
-    const msg = e.message === 'boat_blocked' ? 'Barco bloqueado por una pre-reserva activa.' : e.message;
+    const msg = e.message === 'boat_blocked' ? 'Barco bloqueado por una pre-reserva activa.' : (e.message === 'boat_maintenance' ? 'Barco bloqueado por mantenimiento.' : e.message);
     showToast('Error al reservar: ' + msg, 'error');
   }
 }
