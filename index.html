@@ -604,6 +604,10 @@
     <input id="newResHours" type="number" min="1" step="0.5" placeholder="ej. 4">
     <label>Monto (MXN)</label>
     <input id="newResAmount" type="number" min="0" step="1" placeholder="ej. 3000">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:6px;cursor:pointer;">
+      <input type="checkbox" id="newResPreReserva" style="width:auto;">
+      <span>⏱ Pre-reservar (bloquea el barco 1 hora mientras cierras la venta)</span>
+    </label>
     <div class="modal-actions">
       <button class="btn secondary" style="flex:1" onclick="closeModal('addReservationModal')">Cancelar</button>
       <button class="btn" style="flex:1" onclick="submitAddReservation()">Reservar</button>
@@ -1141,6 +1145,7 @@ let calState = { month: today.getMonth(), year: today.getFullYear(), reservation
 
 async function loadCalendar(){
   try{
+    await cleanExpiredPreReservas();
     const [reservations, boats] = await Promise.all([
       callRpc('list_reservations', { p_token: session.token }),
       callRpc('list_boats', { p_token: session.token })
@@ -1171,11 +1176,12 @@ function buildCalGrid(month, year, reservations, boats, onDayClick){
     const isToday = dateStr === todayStr;
     const chips = dayRes.slice(0,3).map(r => {
       const boat = boats.find(b => b.id === r.boat_id);
-      const bg = boat ? (boat.color || '#1a5276') : '#1a5276';
+      const isPreChip = r.pre_reserva && r.pre_reserva_expires && new Date(r.pre_reserva_expires) > new Date();
+      const bg = isPreChip ? '#c9a84c' : (boat ? (boat.color || '#1a5276') : '#1a5276');
       const label = boat ? boat.name.slice(0,4) : 'Bco';
       const time = r.departure_time ? r.departure_time.slice(0,5) : (r.hours ? r.hours + 'h' : '');
       const isDirect = !r.vendor_id;
-      return `<div class="cal-chip${isDirect ? ' direct' : ''}" style="background:${bg};color:#fff;">${escapeHtml(label)}${time ? ' ' + time : ''}</div>`;
+      return `<div class="cal-chip${isDirect ? ' direct' : ''}" style="background:${bg};color:#fff;">${escapeHtml(label)}${time ? ' ' + time : ''}${isPreChip ? ' ⏱' : ''}</div>`;
     }).join('');
     const extra = dayRes.length > 3 ? `<div class="cal-more">+${dayRes.length-3}</div>` : '';
     html += `<div class="cal-day${isToday?' today':''}" onclick="${onDayClick}('${dateStr}')">
@@ -1205,12 +1211,15 @@ function showCalDay(dateStr){
   const addBtn = canAdd ? `<button class="btn" style="width:100%;margin-bottom:12px;" onclick="openAddReservationFromCalendar('${dateStr}')">+ Agregar reserva</button>` : '';
   const list = dayRes.map(r => {
     const boat = calState.boats.find(b => b.id === r.boat_id);
-    return `<div class="item-card" style="margin-bottom:10px;${boat ? 'border-left-color:'+boat.color+';' : ''}">
-      <h3>${escapeHtml(boat ? boat.name : 'Barco')}</h3>
+    const isPre = r.pre_reserva && r.pre_reserva_expires && new Date(r.pre_reserva_expires) > new Date();
+    const minsLeft = isPre ? Math.max(0, Math.round((new Date(r.pre_reserva_expires) - new Date())/60000)) : 0;
+    const borderColor = isPre ? '#c9a84c' : (boat ? boat.color : '');
+    return `<div class="item-card" style="margin-bottom:10px;${borderColor ? 'border-left-color:'+borderColor+';' : ''}${isPre ? 'background:rgba(201,168,76,0.1);' : ''}">
+      <h3>${escapeHtml(boat ? boat.name : 'Barco')}${isPre ? ' ⏱' : ''}</h3>
       <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
-      <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
-      ${canAdd ? `<div style="margin-top:10px;display:flex;gap:8px;">
-        <button class="btn secondary" style="flex:1;" onclick="openEditReservation('${r.id}')">Editar</button>
+      ${isPre ? `<div class="meta" style="color:#c9a84c;">Se libera en ${minsLeft} min si no se confirma</div>` : `<span class="status-pill ${r.status}">${statusLabel(r.status)}</span>`}
+      ${canAdd ? `<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        ${isPre ? `<button class="btn" style="flex:1;" onclick="confirmPreReservaUI('${r.id}')">✅ Confirmar</button>` : `<button class="btn secondary" style="flex:1;" onclick="openEditReservation('${r.id}')">Editar</button>`}
         <button class="btn secondary" style="flex:1;color:var(--danger);" onclick="confirmDeleteReservation('${r.id}')">Eliminar</button>
       </div>` : ''}
     </div>`;
@@ -2578,10 +2587,12 @@ function showVendorCalDay(dateStr){
   document.getElementById('vendorDetailTitle').textContent = dateStr;
   const box = document.getElementById('vendorDetailList');
   box.innerHTML = dayRes.map(r => {
-    return `<div class="item-card" style="margin-bottom:10px;">
-      <h3>${escapeHtml(boatsById[r.boat_id] || 'Barco')}</h3>
+    const isPre = r.pre_reserva && r.pre_reserva_expires && new Date(r.pre_reserva_expires) > new Date();
+    const minsLeft = isPre ? Math.max(0, Math.round((new Date(r.pre_reserva_expires) - new Date())/60000)) : 0;
+    return `<div class="item-card" style="margin-bottom:10px;${isPre ? 'background:rgba(201,168,76,0.1);border-left-color:#c9a84c;' : ''}">
+      <h3>${escapeHtml(boatsById[r.boat_id] || 'Barco')}${isPre ? ' ⏱' : ''}</h3>
       <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
-      <span class="status-pill ${r.status}">${statusLabel(r.status)}</span>
+      ${isPre ? `<div class="meta" style="color:#c9a84c;">Se libera en ${minsLeft} min si no se confirma</div><button class="btn" style="width:100%;margin-top:8px;" onclick="confirmPreReservaUI('${r.id}')">✅ Confirmar</button>` : `<span class="status-pill ${r.status}">${statusLabel(r.status)}</span>`}
     </div>`;
   }).join('');
   openModal('vendorDetailModal');
@@ -2593,6 +2604,7 @@ async function loadMyReservations(){
   const summary = document.getElementById('vendorSummary');
   grid.innerHTML = '';
   try{
+    await cleanExpiredPreReservas();
     const reservations = await callRpc('list_reservations', { p_token: session.token });
 
     if (session.vendor_type === 'empresa_credito') {
@@ -2629,32 +2641,72 @@ async function loadMyReservations(){
   }
 }
 
+function findActivePreReserva(boat_id, date){
+  const pools = [calState.reservations, (typeof vendorCalState !== 'undefined' ? vendorCalState.reservations : null)];
+  const now = new Date();
+  for (const pool of pools){
+    if (!pool) continue;
+    const hit = pool.find(r => r.boat_id === boat_id && r.reservation_date === date && r.pre_reserva && r.pre_reserva_expires && new Date(r.pre_reserva_expires) > now);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+async function confirmPreReservaUI(resId){
+  try{
+    await callRpc('confirm_pre_reserva', { p_token: session.token, p_reservation_id: resId });
+    showToast('Reserva confirmada ✅');
+    closeModal('vendorDetailModal');
+    await refreshReservationViews();
+  }catch(e){ showToast('Error al confirmar: ' + e.message, 'error'); }
+}
+
+async function cleanExpiredPreReservas(){
+  if (!session || !session.token) return;
+  try{ await callRpc('clean_expired_pre_reservas', { p_token: session.token }); }catch(e){}
+}
+
 async function submitAddReservation(){
   const boat_id = document.getElementById('newResBoat').value;
   const date = document.getElementById('newResDate').value;
   const hours = document.getElementById('newResHours').value;
   const amount = document.getElementById('newResAmount').value;
+  const preChk = document.getElementById('newResPreReserva');
+  const isPre = preChk ? preChk.checked : false;
   if (!boat_id || !date) return alert('Elige barco y fecha.');
+  if (!isPre) {
+    const blocked = findActivePreReserva(boat_id, date);
+    if (blocked) {
+      const mins = Math.max(0, Math.round((new Date(blocked.pre_reserva_expires) - new Date())/60000));
+      return showToast(`⛔ Barco bloqueado por pre-reserva. Se libera en $${mins} min.`, 'error');
+    }
+  }
   try{
-    await callRpc('create_reservation', {
+    await callRpc(isPre ? 'create_pre_reserva' : 'create_reservation', {
       p_token: session.token, p_boat_id: boat_id, p_reservation_date: date,
       p_hours: hours ? Number(hours) : null, p_amount: amount ? Number(amount) : 0
     });
     closeModal('addReservationModal');
     document.getElementById('newResHours').value = '';
     document.getElementById('newResAmount').value = '';
+    if (preChk) preChk.checked = false;
     if (!document.getElementById('vendorScreen').classList.contains('hidden')) {
       await loadMyReservations();
     } else if (!document.getElementById('dashboardScreen').classList.contains('hidden')) {
       await loadCalendar();
     }
-    showToast('Reserva creada 🚤');
-    fetch(EDGE('notify-reservation'), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
-      body: JSON.stringify({ token: session.token, boat_id: boat_id, reservation_date: date })
-    }).catch(() => {});
-  }catch(e){ showToast('Error al reservar: ' + e.message, 'error'); }
+    showToast(isPre ? 'Pre-reserva creada ⏱' : 'Reserva creada 🚤');
+    if (!isPre) {
+      fetch(EDGE('notify-reservation'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
+        body: JSON.stringify({ token: session.token, boat_id: boat_id, reservation_date: date })
+      }).catch(() => {});
+    }
+  }catch(e){
+    const msg = e.message === 'boat_blocked' ? 'Barco bloqueado por una pre-reserva activa.' : e.message;
+    showToast('Error al reservar: ' + msg, 'error');
+  }
 }
 
 async function openTelegramModal(){
@@ -2973,6 +3025,8 @@ document.querySelectorAll('.role-card').forEach(card => {
 document.getElementById('quickLoginPin')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') doQuickLogin();
 });
+
+setInterval(cleanExpiredPreReservas, 5*60*1000);
 
 (function init(){
   initLoginScreen();
