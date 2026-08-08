@@ -245,19 +245,19 @@
   <div class="wrap">
     <div class="tabs" id="tabBar">
       <button class="tab-btn active" id="tabBtnOperacion" onclick="switchTab('operacion')"><i class="fa-solid fa-gauge"></i>Operación</button>
-      <button class="tab-btn hidden" id="tabBtnBarcos" onclick="switchTab('barcos')"><i class="fa-solid fa-ship"></i>Barcos</button>
       <button class="tab-btn hidden" id="tabBtnCalendario" onclick="switchTab('calendario')"><i class="fa-solid fa-calendar-days"></i>Calendario</button>
-      <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')"><i class="fa-solid fa-users"></i>Equipo</button>
-      <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')"><i class="fa-solid fa-star"></i>Vendedores</button>
-      <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')"><i class="fa-solid fa-chart-bar"></i>Reportes</button>
-      <button class="tab-btn hidden" id="tabBtnGastos" onclick="switchTab('gastos')"><i class="fa-solid fa-sack-dollar"></i>Gastos</button>
+      <button class="tab-btn hidden" id="tabBtnBarcos" onclick="switchTab('barcos')"><i class="fa-solid fa-ship"></i>Barcos</button>
       <button class="tab-btn hidden" id="tabBtnViajes" onclick="switchTab('viajes')"><i class="fa-solid fa-route"></i>Viajes</button>
       <button class="tab-btn hidden" id="tabBtnFallos" onclick="switchTab('fallos')"><i class="fa-solid fa-triangle-exclamation"></i>Fallos</button>
       <button class="tab-btn hidden" id="tabBtnPiezas" onclick="switchTab('piezas')"><i class="fa-solid fa-screwdriver-wrench"></i>Piezas</button>
+      <button class="tab-btn hidden" id="tabBtnCombustible" onclick="switchTab('combustible')"><i class="fa-solid fa-gas-pump"></i>Combustible</button>
+      <button class="tab-btn hidden" id="tabBtnGastos" onclick="switchTab('gastos')"><i class="fa-solid fa-sack-dollar"></i>Gastos</button>
+      <button class="tab-btn hidden" id="tabBtnEquipo" onclick="switchTab('equipo')"><i class="fa-solid fa-users"></i>Equipo</button>
+      <button class="tab-btn hidden" id="tabBtnVendedores" onclick="switchTab('vendedores')"><i class="fa-solid fa-star"></i>Vendedores</button>
       <button class="tab-btn hidden" id="tabBtnEmpresas" onclick="switchTab('empresas')"><i class="fa-solid fa-building"></i>Empresas</button>
+      <button class="tab-btn hidden" id="tabBtnReportes" onclick="switchTab('reportes')"><i class="fa-solid fa-chart-bar"></i>Reportes</button>
       <button class="tab-btn hidden" id="tabBtnReporteEmpresas" onclick="switchTab('reporteEmpresas')"><i class="fa-solid fa-chart-line"></i>Reporte empresas</button>
       <button class="tab-btn hidden" id="tabBtnReportesDirectos" onclick="switchTab('reportesDirectos')"><i class="fa-solid fa-file-invoice-dollar"></i>Reportes directos</button>
-      <button class="tab-btn hidden" id="tabBtnCombustible" onclick="switchTab('combustible')"><i class="fa-solid fa-gas-pump"></i>Combustible</button>
     </div>
 
     <div id="panelBarcos" class="tab-panel">
@@ -1136,7 +1136,7 @@ function roleLabel(r){
 function switchTab(name){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const btnMap = { operacion: 0, barcos: 1, calendario: 2, equipo: 3, vendedores: 4, reportes: 5, gastos: 6, viajes: 7, fallos: 8, piezas: 9, empresas: 10, reporteEmpresas: 11, reportesDirectos: 12, combustible: 13 };
+  const btnMap = { operacion: 0, calendario: 1, barcos: 2, viajes: 3, fallos: 4, piezas: 5, combustible: 6, gastos: 7, equipo: 8, vendedores: 9, empresas: 10, reportes: 11, reporteEmpresas: 12, reportesDirectos: 13 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
   if (!loadedTabs.has(name)) {
