@@ -1149,10 +1149,14 @@ function switchTab(name){
   const btnMap = { operacion: 0, calendario: 1, barcos: 2, viajes: 3, fallos: 4, piezas: 5, combustible: 6, gastos: 7, equipo: 8, vendedores: 9, empresas: 10, reportes: 11, reporteEmpresas: 12, reportesDirectos: 13 };
   document.querySelectorAll('.tab-btn')[btnMap[name]].classList.add('active');
   document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  if (name === 'calendario') {
+    loadedTabs.add(name);
+    loadCalendar();
+    return;
+  }
   if (!loadedTabs.has(name)) {
     loadedTabs.add(name);
     if (name === 'barcos') loadBoats();
-    if (name === 'calendario') loadCalendar();
     if (name === 'equipo') loadUsers();
     if (name === 'vendedores') loadVendors();
     if (name === 'reportes') loadReports();
