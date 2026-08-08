@@ -2631,6 +2631,17 @@ function openAddReservation(dateStr){
 }
 
 let vendorCalState = { month: today.getMonth(), year: today.getFullYear(), reservations: [] };
+let vendorMyReservationsById = {};
+
+function findExistingReservation(boat_id, date){
+  const pools = [calState.reservations, (typeof vendorCalState !== 'undefined' ? vendorCalState.reservations : null)];
+  for (const pool of pools){
+    if (!pool) continue;
+    const hit = pool.find(r => r.boat_id === boat_id && r.reservation_date === date && !r.pre_reserva);
+    if (hit) return hit;
+  }
+  return null;
+}
 
 function renderVendorCalendarGrid(){
   const { month, year, reservations } = vendorCalState;
@@ -2653,9 +2664,16 @@ function showVendorCalDay(dateStr){
   box.innerHTML = dayRes.map(r => {
     const isPre = r.pre_reserva && r.pre_reserva_expires && new Date(r.pre_reserva_expires) > new Date();
     const minsLeft = isPre ? Math.max(0, Math.round((new Date(r.pre_reserva_expires) - new Date())/60000)) : 0;
+    const full = r.is_mine ? vendorMyReservationsById[r.id] : null;
+    if (!r.is_mine) {
+      return `<div class="item-card" style="margin-bottom:10px;${isPre ? 'background:rgba(201,168,76,0.1);border-left-color:#c9a84c;' : ''}">
+        <h3>${escapeHtml(boatsById[r.boat_id] || 'Barco')}${isPre ? ' ⏱' : ''}</h3>
+        <div class="meta">${r.hours || '-'} hrs · ${isPre ? 'Pre-reservado por otro vendedor' : 'Reservado por otro vendedor'}</div>
+      </div>`;
+    }
     return `<div class="item-card" style="margin-bottom:10px;${isPre ? 'background:rgba(201,168,76,0.1);border-left-color:#c9a84c;' : ''}">
       <h3>${escapeHtml(boatsById[r.boat_id] || 'Barco')}${isPre ? ' ⏱' : ''}</h3>
-      <div class="meta">${r.hours || '-'} hrs · ${fmtMoney(r.amount)} · pagado ${fmtMoney(r.paid_amount)}</div>
+      <div class="meta">${(full ? full.hours : r.hours) || '-'} hrs · ${fmtMoney(full ? full.amount : 0)} · pagado ${fmtMoney(full ? full.paid_amount : 0)}</div>
       ${isPre ? `<div class="meta" style="color:#c9a84c;">Se libera en ${minsLeft} min si no se confirma</div><button class="btn" style="width:100%;margin-top:8px;" onclick="confirmPreReservaUI('${r.id}')">✅ Confirmar</button>` : `<span class="status-pill ${r.status}">${statusLabel(r.status)}</span>`}
     </div>`;
   }).join('');
@@ -2669,7 +2687,12 @@ async function loadMyReservations(){
   grid.innerHTML = '';
   try{
     await cleanExpiredPreReservas();
-    const reservations = await callRpc('list_reservations', { p_token: session.token });
+    const [reservations, calendarReservations] = await Promise.all([
+      callRpc('list_reservations', { p_token: session.token }),
+      callRpc('list_reservations_calendar', { p_token: session.token })
+    ]);
+    vendorMyReservationsById = {};
+    reservations.forEach(r => { vendorMyReservationsById[r.id] = r; });
 
     if (session.vendor_type === 'empresa_credito') {
       const totalReservado = reservations.reduce((s,r) => s + Number(r.amount||0), 0);
@@ -2686,7 +2709,7 @@ async function loadMyReservations(){
       `;
     }
 
-    vendorCalState.reservations = reservations;
+    vendorCalState.reservations = calendarReservations;
     renderVendorCalendarGrid();
 
     if (!reservations.length){ empty.classList.remove('hidden'); return; }
@@ -2745,6 +2768,10 @@ async function submitAddReservation(){
       return showToast(`⛔ Barco bloqueado por pre-reserva. Se libera en $${mins} min.`, 'error');
     }
   }
+  const existingRes = findExistingReservation(boat_id, date);
+  if (existingRes) {
+    return showToast('⛔ Ese barco ya tiene una reserva para esa fecha.', 'error');
+  }
   try{
     await callRpc(isPre ? 'create_pre_reserva' : 'create_reservation', {
       p_token: session.token, p_boat_id: boat_id, p_reservation_date: date,
@@ -2768,7 +2795,8 @@ async function submitAddReservation(){
       }).catch(() => {});
     }
   }catch(e){
-    const msg = e.message === 'boat_blocked' ? 'Barco bloqueado por una pre-reserva activa.' : (e.message === 'boat_maintenance' ? 'Barco bloqueado por mantenimiento.' : e.message);
+    const errMap = { boat_blocked: 'Barco bloqueado por una pre-reserva activa.', boat_maintenance: 'Barco bloqueado por mantenimiento.', date_already_booked: 'Ese barco ya tiene una reserva para esa fecha.' };
+    const msg = errMap[e.message] || e.message;
     showToast('Error al reservar: ' + msg, 'error');
   }
 }
