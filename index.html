@@ -26,14 +26,24 @@
     --bg:#eaf2fb;--card:#ffffff;--dtext:#0d1f3c;--dmuted:#5a7090;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  body{margin:0;font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--dtext);min-height:100vh;}
+  body{margin:0;font-family:'Rajdhani',sans-serif;background:var(--bg);color:var(--dtext);min-height:100vh;overflow-x:hidden;}
+  html{overflow-x:hidden;}
   .wrap{max-width:1000px;margin:0 auto;padding:20px 20px 88px;position:relative;z-index:1;}
 
   /* ── APP HEADER ── */
-  header{display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1.25rem;background:rgba(13,31,60,0.97);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);}
+  header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;padding:0.75rem 1.25rem;background:rgba(13,31,60,0.97);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);}
   header .brand{font-family:'Cormorant Garamond',serif;font-weight:700;font-size:22px;letter-spacing:.5px;color:var(--gold);}
   header .who{font-size:13px;color:var(--muted);text-align:right;}
-  header button{background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:var(--gold);padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.5px;}
+  header button{background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.4);color:var(--gold);padding:6px 14px;border-radius:20px;cursor:pointer;font-size:13px;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.5px;white-space:nowrap;}
+  header .header-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;}
+  @media (max-width:600px){
+    header{padding:.6rem .9rem;gap:8px;}
+    header .brand{font-size:17px;}
+    header .header-actions{gap:8px;}
+    header button{padding:5px 10px;font-size:12px;}
+    header .who{font-size:11px;}
+    .wrap{padding:16px 12px 88px;}
+  }
   header button:hover{background:rgba(201,168,76,0.28);}
 
   /* ── LOGIN ── */
@@ -234,7 +244,7 @@
 <div id="dashboardScreen" class="hidden">
   <header>
     <div class="brand" id="companyNameLabel">Charter Sealife</div>
-    <div style="display:flex;align-items:center;gap:14px;">
+    <div class="header-actions">
       <button class="hidden" id="subscribeHeaderBtn" onclick="startCheckout()"></button>
       <button class="hidden" id="manageSubBtn" onclick="openPortal()">Gestionar suscripción</button>
       <button class="hidden" id="telegramBtn" onclick="openTelegramModal()"><i class="fa-brands fa-telegram"></i> Telegram</button>
@@ -429,7 +439,7 @@
 <div id="vendorScreen" class="hidden">
   <header>
     <div class="brand" id="vendorCompanyLabel">Charter Sealife</div>
-    <div style="display:flex;align-items:center;gap:14px;">
+    <div class="header-actions">
       <div class="who" id="vendorWhoLabel"></div>
       <button onclick="doLogout()">Salir</button>
     </div>
@@ -456,7 +466,7 @@
 <div id="capitanScreen" class="hidden">
   <header>
     <div class="brand" id="capitanCompanyLabel">Charter Sealife</div>
-    <div style="display:flex;align-items:center;gap:14px;">
+    <div class="header-actions">
       <div class="who" id="capitanWhoLabel"></div>
       <button onclick="doLogout()">Salir</button>
     </div>
@@ -493,7 +503,7 @@
 <div id="mecanicoScreen" class="hidden">
   <header>
     <div class="brand" id="mecanicoCompanyLabel">Charter Sealife</div>
-    <div style="display:flex;align-items:center;gap:14px;">
+    <div class="header-actions">
       <div class="who" id="mecanicoWhoLabel"></div>
       <button onclick="doLogout()">Salir</button>
     </div>
